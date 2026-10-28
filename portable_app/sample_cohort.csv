@@ -1,0 +1,5 @@
+patient_id,mrn,procedure_date,clinical_note
+P1001,MRN09812,2026-03-15,"INDICATION: NSTEMI. CONCLUSION: Successful culprit PCI to mid LAD today. Plan for staged PCI to severe 90% RCA lesion in 3 to 4 weeks. DAPT continued."
+P1002,MRN04421,2026-03-16,"CATH REPORT. IMPRESSION: Severe 3-vessel CAD with LVEF 25%, decompensated congestive heart failure (HFrEF) and atrial fibrillation. Referred for urgent CABG evaluation. No staged PCI."
+P1003,MRN01156,2026-03-17,"ANGIOGRAM SUMMARY: Single vessel CAD s/p prior stent. Mild 30% LCx disease. No indication for staged PCI."
+P1004,MRN07732,2026-03-18,"TRANSTHORACIC ECHO. FINDINGS: 2D Biplane Simpson's LVEF 42%. Moderate MR. CONCLUSION: Mildly reduced LV systolic function with visually estimated LVEF 40-45%. LVEF improved from prior 25% (2022)."

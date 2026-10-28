@@ -26,7 +26,12 @@ try:
 except ImportError:
     fuzz = None
 
-from .section_parser import ClinicalSectionParser, ParsedDocument
+try:
+    from .section_parser import ClinicalSectionParser, ParsedDocument
+    from .echo_lvef import EchoLVEFExtractor, EchoLVEFResult
+except ImportError:
+    from section_parser import ClinicalSectionParser, ParsedDocument
+    from echo_lvef import EchoLVEFExtractor, EchoLVEFResult
 
 
 @dataclass
@@ -62,6 +67,10 @@ class DocumentTagResult:
     processing_ms: float
     peak_tier_used: str
     used_ocr_fallback: bool = False
+    lvef_extracted: str = "NONE"
+    lvef_numeric: Optional[float] = None
+    lvef_method: str = "NONE"
+    lvef_section: str = "NONE"
 
 
 class CascadingCardioSieve:
@@ -162,6 +171,7 @@ class CascadingCardioSieve:
     ):
         self.ontology = ontology
         self.section_parser = ClinicalSectionParser()
+        self.echo_lvef_extractor = EchoLVEFExtractor()
         self.enable_gliner = enable_gliner
         self.enable_ollama = enable_ollama
         self.ollama_endpoint = ollama_endpoint
@@ -270,6 +280,9 @@ class CascadingCardioSieve:
                 if not staged_timeframe and sm.planned_timeframe:
                     staged_timeframe = sm.planned_timeframe
 
+        # Extract dedicated Echocardiographic LVEF with hierarchical section/method ranking
+        echo_lvef = self.echo_lvef_extractor.extract(parsed)
+
         elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 3)
         return DocumentTagResult(
             pdf_path=pdf_path,
@@ -285,6 +298,10 @@ class CascadingCardioSieve:
             processing_ms=elapsed_ms,
             peak_tier_used=peak_tier,
             used_ocr_fallback=parsed.used_ocr_fallback,
+            lvef_extracted=echo_lvef.lvef_extracted,
+            lvef_numeric=echo_lvef.lvef_numeric,
+            lvef_method=echo_lvef.lvef_method,
+            lvef_section=echo_lvef.lvef_section,
         )
 
     def _scan_sections_for_concept(

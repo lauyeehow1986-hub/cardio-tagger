@@ -49,15 +49,15 @@ class ClinicalSectionParser:
     CONCLUSION_HEADER_PATTERNS = [
         re.compile(
             r"(?im)^[\t ]*(?:(?:[0-9IVX]+[\.\)]|\*|\#+)[\t ]*)?"
-            r"(?P<header>(?:FINAL[\t ]+|CATHETERIZATION[\t ]+|ANGIOGRAPHIC[\t ]+|CLINICAL[\t ]+|PROCEDURE[\t ]+|DISCHARGE[\t ]+)?"
+            r"(?P<header>(?:FINAL[\t ]+|CATHETERIZATION[\t ]+|ANGIOGRAPHIC[\t ]+|CLINICAL[\t ]+|PROCEDURE[\t ]+|DISCHARGE[\t ]+|ECHOCARDIOGRAPHIC[\t ]+|OVERALL[\t ]+)?"
             r"(?:CONCLUSIONS?\s*(?:AND|&|/)\s*RECOMMENDATIONS?|CONCLUSIONS?\s*(?:AND|&|/)\s*PLAN|"
             r"IMPRESSIONS?\s*(?:AND|&|/)\s*PLAN|SUMMARY\s*(?:AND|&|/)\s*RECOMMENDATIONS?|"
             r"CONCLUSIONS?|IMPRESSIONS?|FINAL[\t ]+SUMMARY|RECOMMENDATIONS?\s*(?:AND|&|/)\s*PLAN|"
-            r"ASSESSMENT\s*(?:AND|&|/)\s*PLAN))"
+            r"ASSESSMENT\s*(?:AND|&|/)\s*PLAN|OVERALL[\t ]+IMPRESSION|FINAL[\t ]+IMPRESSION|SUMMARY))"
             r"[\t ]*(?:[:\-—\n]|\s*$)"
         ),
         re.compile(
-            r"(?im)(?:^|\n)[\t ]*(?P<header>CONCLUSIONS?|IMPRESSIONS?|RECOMMENDATIONS?|SUMMARY)[\t ]*[:\-—][\t ]*(?=\S)"
+            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?P<header>CONCLUSIONS?|IMPRESSIONS?|RECOMMENDATIONS?|SUMMARY)[\t ]*[:\-—][\t ]*(?:\n|\S|$)"
         ),
         re.compile(
             r"(?im)^\s*\|[\t ]*(?P<header>CONCLUSIONS?|IMPRESSIONS?|SUMMARY)[\t ]*\|"
@@ -66,22 +66,34 @@ class ClinicalSectionParser:
 
     OTHER_SECTION_HEADERS = {
         "indication": re.compile(
-            r"(?im)^[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:INDICATIONS?|HISTORY|CLINICAL[\t ]+HISTORY)[\t ]*(?:[:\-—\n]|$)"
+            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:INDICATIONS?|HISTORY|CLINICAL[\t ]+HISTORY)[\t ]*(?:[:\-—\n]|$)"
         ),
         "procedure": re.compile(
-            r"(?im)^[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:PROCEDURES?[\t ]+PERFORMED|PROCEDURE[\t ]+DETAILS?|TECHNIQUE|INTERVENTION)[\t ]*(?:[:\-—\n]|$)"
+            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:PROCEDURES?[\t ]+PERFORMED|PROCEDURE[\t ]+DETAILS?|TECHNIQUE|INTERVENTION)[\t ]*(?:[:\-—\n]|$)"
         ),
         "hemodynamics": re.compile(
-            r"(?im)^[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:HEMODYNAMICS?|VENTRICULOGRAPHY|LEFT[\t ]+VENTRICULOGRAM)[\t ]*(?:[:\-—\n]|$)"
+            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:HEMODYNAMICS?|VENTRICULOGRAPHY|LEFT[\t ]+VENTRICULOGRAM)[\t ]*(?:[:\-—\n]|$)"
         ),
         "findings": re.compile(
-            r"(?im)^[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:CORONARY[\t ]+ANGIOGRAPHY|ANGIOGRAPHIC[\t ]+FINDINGS?|FINDINGS?|CORONARY[\t ]+ANATOMY)[\t ]*(?:[:\-—\n]|$)"
+            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:"
+            r"CORONARY[\t ]+ANGIOGRAPHY|ANGIOGRAPHIC[\t ]+FINDINGS?|FINDINGS?|CORONARY[\t ]+ANATOMY|"
+            r"LEFT[\t ]+VENTRICLE|LV[\t ]+SYSTOLIC[\t ]+FUNCTION|VENTRICULAR[\t ]+FUNCTION|"
+            r"WALL[\t ]+MOTION[\t ]+FINDINGS?|CHAMBERS?|ECHOCARDIOGRAPHIC[\t ]+FINDINGS?|2D[\t ]+FINDINGS?"
+            r")[\t ]*(?:[:\-—\n]|$)"
+        ),
+        "measurements": re.compile(
+            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:"
+            r"QUANTITATIVE[\t ]+MEASUREMENTS?|ECHO(?:CARDIOGRAPHIC)?[\t ]+MEASUREMENTS?|"
+            r"MEASUREMENTS?|2D[\t ]+MEASUREMENTS?|M[\-\s]MODE[\t ]+(?:&|AND[\t ]+)?2D[\t ]+MEASUREMENTS?|"
+            r"HEMODYNAMICS?[\t ]+(?:&|AND[\t ]+)?MEASUREMENTS?|MEASUREMENTS?[\t ]+(?:&|AND[\t ]+)?CALCULATIONS?|"
+            r"DOPPLER[\t ]+MEASUREMENTS?|DIMENSIONS?|QUANTITATIVE[\t ]+DATA"
+            r")[\t ]*(?:[:\-—\n]|$)"
         ),
         "complications": re.compile(
-            r"(?im)^[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:COMPLICATIONS?|ESTIMATED[\t ]+BLOOD[\t ]+LOSS)[\t ]*(?:[:\-—\n]|$)"
+            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:COMPLICATIONS?|ESTIMATED[\t ]+BLOOD[\t ]+LOSS)[\t ]*(?:[:\-—\n]|$)"
         ),
         "plan": re.compile(
-            r"(?im)^[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:PLAN|DISPOSITION|FOLLOW[\t \-]UP[\t ]+PLAN|POST[\t \-]PROCEDURE[\t ]+PLAN|RECOMMENDATIONS?)[\t ]*(?:[:\-—\n]|$)"
+            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:PLAN|DISPOSITION|FOLLOW[\t \-]UP[\t ]+PLAN|POST[\t \-]PROCEDURE[\t ]+PLAN|RECOMMENDATIONS?)[\t ]*(?:[:\-—\n]|$)"
         ),
     }
 

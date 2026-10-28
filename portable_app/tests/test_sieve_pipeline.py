@@ -255,6 +255,23 @@ def test_csv_input_processing(tmp_path):
         assert reader[2]["has_cardiomyopathy_myocarditis"] == "True"
 
 
+def test_echo_lvef_sieve_integration():
+    sieve = get_sieve()
+    text = (
+        "ECHOCARDIOGRAM REPORT\n"
+        "FINDINGS:\n"
+        "Left ventricle: normal wall thickness. 2D Biplane Simpson's LVEF 52%.\n\n"
+        "CONCLUSION:\n"
+        "1. Normal LV systolic function; visually estimated LVEF is 50-55%.\n"
+        "2. No regional wall motion abnormalities."
+    )
+    res = sieve.evaluate_document("echo_test.pdf", [text])
+    assert res.lvef_extracted == "50-55%"
+    assert res.lvef_numeric == 52.5
+    assert res.lvef_method == "VISUAL"
+    assert res.lvef_section == "CONCLUSION"
+
+
 
 if __name__ == "__main__":
     test_case1_final_page_newline()

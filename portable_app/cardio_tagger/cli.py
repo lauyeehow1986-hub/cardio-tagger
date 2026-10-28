@@ -441,6 +441,10 @@ def main():
             "staged_pci_vessels",
             "staged_pci_timeframe",
             "staged_pci_confidence",
+            "lvef_extracted",
+            "lvef_numeric",
+            "lvef_method",
+            "lvef_section",
             "detected_cardio_concepts",
             "conclusion_found",
             "peak_tier_used",
@@ -481,6 +485,10 @@ def main():
                         row_out["staged_pci_vessels"] = ";".join(res_dict["staged_pci_vessels"])
                         row_out["staged_pci_timeframe"] = res_dict["staged_pci_timeframe"] or ""
                         row_out["staged_pci_confidence"] = res_dict["staged_pci_confidence"]
+                        row_out["lvef_extracted"] = res_dict.get("lvef_extracted", "NONE")
+                        row_out["lvef_numeric"] = res_dict.get("lvef_numeric")
+                        row_out["lvef_method"] = res_dict.get("lvef_method", "NONE")
+                        row_out["lvef_section"] = res_dict.get("lvef_section", "NONE")
                         row_out["detected_cardio_concepts"] = concept_dict["detected_cardio_concepts"]
                         row_out["conclusion_found"] = res_dict["conclusion_found"]
                         row_out["peak_tier_used"] = res_dict["peak_tier_used"]
@@ -535,6 +543,10 @@ def main():
             "staged_pci_vessels",
             "staged_pci_timeframe",
             "staged_pci_confidence",
+            "lvef_extracted",
+            "lvef_numeric",
+            "lvef_method",
+            "lvef_section",
             "detected_cardio_concepts",
             "matched_concepts_count",
             "peak_tier_used",
@@ -575,6 +587,10 @@ def main():
                             "staged_pci_vessels": ";".join(res_dict["staged_pci_vessels"]),
                             "staged_pci_timeframe": res_dict["staged_pci_timeframe"] or "",
                             "staged_pci_confidence": res_dict["staged_pci_confidence"],
+                            "lvef_extracted": res_dict.get("lvef_extracted", "NONE"),
+                            "lvef_numeric": res_dict.get("lvef_numeric"),
+                            "lvef_method": res_dict.get("lvef_method", "NONE"),
+                            "lvef_section": res_dict.get("lvef_section", "NONE"),
                             "detected_cardio_concepts": concept_dict["detected_cardio_concepts"],
                             "matched_concepts_count": len(res_dict["all_concept_matches"]),
                             "peak_tier_used": res_dict["peak_tier_used"],

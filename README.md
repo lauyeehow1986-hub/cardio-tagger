@@ -105,6 +105,10 @@ The generated CSV and Parquet files contain the following clinical schema:
 | `staged_pci_vessels` | String | `MID-LAD;RCA` | Extracted target coronary branches |
 | `staged_pci_timeframe` | String | `in 4 weeks` | Extracted staging timeframe |
 | `staged_pci_confidence`| Float | `0.99` | Sieve confidence score (0.0 to 1.0) |
+| `lvef_extracted` | String | **`50-55%`** / **`58%`** | **Extracted LVEF from report (single value, range, or qualitative)** |
+| `lvef_numeric` | Float | **`52.5`** / **`58.0`** | **Calculated midpoint numeric float for quantitative analysis** |
+| `lvef_method` | Enum | **`3D`**, **`2D_BIPLANE`**, **`VISUAL`** | **Measurement method resolved by strict 3D > 2D > Visual preference** |
+| `lvef_section` | Enum | **`CONCLUSION`**, **`FINDINGS`**, **`MEASUREMENTS`** | **Section resolved by strict Conclusion > Findings > Measurements priority** |
 | `detected_cardio_concepts`| String | `CARDIO_AMI;CARDIO_STAGED_PCI` | Semicolon-delimited list of all affirmed cardiology concepts |
 | `conclusion_found` | Boolean | `True` | Whether a conclusion section was detected |
 | `total_pages` | Integer | `3` | Total pages in PDF (or 1 for CSV note) |
