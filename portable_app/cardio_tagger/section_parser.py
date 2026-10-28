@@ -183,11 +183,12 @@ class ClinicalSectionParser:
                 if sec.section_type in ("conclusion", "plan"):
                     doc.conclusion_sections.append(sec)
 
-        # Fallback: if a document has no explicit header (e.g. short 1-page cath note or
-        # broken OCR header), extract the bottom 40% of the final page as a synthetic tail window
+        # Fallback: if a document has no explicit header (e.g. short 1-page cath note, CSV note, or
+        # broken OCR header), extract the text as a synthetic conclusion window.
+        # For single-page or notes < 2500 chars, capture the entire text so clinical intent is never lost.
         if not doc.conclusion_sections and page_texts:
             last_page = self._normalize_delimiters(page_texts[-1])
-            tail_start = max(0, int(len(last_page) * 0.60))
+            tail_start = 0 if (total_pages == 1 or len(last_page) < 2500) else max(0, int(len(last_page) * 0.60))
             tail_text = last_page[tail_start:].strip()
             if tail_text:
                 fallback_sec = ExtractedSection(

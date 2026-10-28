@@ -148,6 +148,114 @@ def test_duckdb_checkpointing(tmp_path):
     mgr.close()
 
 
+def test_multi_cardiac_conditions():
+    sieve = get_sieve()
+    from cardio_tagger.cli import _format_concept_fields
+
+    ontology_path = Path(__file__).resolve().parents[1] / "cardio_tagger" / "ontology" / "cardio_concepts.yaml"
+    ontology = yaml.safe_load(ontology_path.read_text(encoding="utf-8"))
+    concepts = ontology.get("concepts", {})
+
+    # Clinical note for HF, AFib, and AMI without staged PCI
+    text = (
+        "IMPRESSION:\n"
+        "1. Acute anterior STEMI (acute myocardial infarction) s/p primary PCI to proximal LAD.\n"
+        "2. Decompensated heart failure with reduced ejection fraction (HFrEF, LVEF 30%).\n"
+        "3. Paroxysmal atrial fibrillation on apixaban.\n"
+        "4. No indication for staged PCI. Medical optimization."
+    )
+    res = sieve.evaluate_document("multi_cardio.pdf", [text], search_all_sections=True)
+    assert res.staged_pci_detected is False
+    assert res.staged_pci_status == "NEGATED"
+
+    formatted = _format_concept_fields({"all_concept_matches": res.all_concept_matches}, concepts)
+    assert formatted["has_acute_myocardial_infarction"] is True
+    assert formatted["has_heart_failure_syndrome"] is True
+    assert formatted["has_atrial_fibrillation_arrhythmia"] is True
+    assert formatted["has_lvef_systolic_function"] is True
+    assert "CARDIO_AMI" in formatted["detected_cardio_concepts"]
+    assert "CARDIO_HEART_FAILURE" in formatted["detected_cardio_concepts"]
+    assert "CARDIO_AFIB" in formatted["detected_cardio_concepts"]
+
+
+def test_csv_input_processing(tmp_path):
+    import csv
+    import subprocess
+
+    input_csv = tmp_path / "clinical_cohort.csv"
+    output_csv = tmp_path / "tagged_cohort.csv"
+    output_jsonl = tmp_path / "tagged_cohort.jsonl"
+    checkpoint_db = tmp_path / "cohort_checkpoint.duckdb"
+
+    # Write a multi-row cohort CSV
+    rows = [
+        {
+            "patient_id": "PT_101",
+            "age": "67",
+            "note_text": "CONCLUSION: Two-vessel CAD. Successful culprit PCI to RCA today; plan for staged PCI to proximal LAD in 4 weeks.",
+        },
+        {
+            "patient_id": "PT_102",
+            "age": "74",
+            "note_text": "SUMMARY: Congestive heart failure exacerbation (HFrEF) and persistent atrial fibrillation. No coronary intervention planned.",
+        },
+        {
+            "patient_id": "PT_103",
+            "age": "55",
+            "note_text": "IMPRESSION: Severe dilated cardiomyopathy with NYHA class III symptoms. No indication for staged PCI.",
+        },
+    ]
+
+    with open(input_csv, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["patient_id", "age", "note_text"])
+        writer.writeheader()
+        writer.writerows(rows)
+
+    # Run the CLI via Python
+    cli_script = Path(__file__).resolve().parents[1] / "cardio_tagger" / "cli.py"
+    cmd = [
+        sys.executable,
+        str(cli_script),
+        "--input-csv",
+        str(input_csv),
+        "--output-csv",
+        str(output_csv),
+        "--output-jsonl",
+        str(output_jsonl),
+        "--checkpoint-db",
+        str(checkpoint_db),
+        "--workers",
+        "2",
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    assert proc.returncode == 0, f"CLI exited with error:\nSTDOUT: {proc.stdout}\nSTDERR: {proc.stderr}"
+
+    assert output_csv.exists()
+    with open(output_csv, "r", encoding="utf-8") as f:
+        reader = list(csv.DictReader(f))
+        assert len(reader) == 3
+
+        # Row 1 (PT_101): Has Staged PCI
+        assert reader[0]["patient_id"] == "PT_101"
+        assert reader[0]["age"] == "67"
+        assert reader[0]["staged_pci_detected"] == "True"
+        assert reader[0]["staged_pci_status"] == "AFFIRMED_PLANNED"
+        assert "LAD" in reader[0]["staged_pci_vessels"]
+
+        # Row 2 (PT_102): Heart Failure + AFib, No Staged PCI
+        assert reader[1]["patient_id"] == "PT_102"
+        assert reader[1]["staged_pci_detected"] == "False"
+        assert reader[1]["has_heart_failure_syndrome"] == "True"
+        assert reader[1]["has_atrial_fibrillation_arrhythmia"] == "True"
+
+        # Row 3 (PT_103): Cardiomyopathy, Negated Staged PCI
+        assert reader[2]["patient_id"] == "PT_103"
+        assert reader[2]["staged_pci_detected"] == "False"
+        assert reader[2]["staged_pci_status"] == "NEGATED"
+        assert reader[2]["has_cardiomyopathy_myocarditis"] == "True"
+
+
+
 if __name__ == "__main__":
     test_case1_final_page_newline()
     test_case2_page1_early_conclusion()

@@ -275,3 +275,87 @@ concepts:
     gliner_labels:
       - "antiplatelet or anticoagulant medication regimen"
       - "duration of dual antiplatelet therapy"
+
+  heart_failure_syndrome:
+    id: "CARDIO_HEART_FAILURE"
+    display_name: "Heart Failure Syndrome (HFrEF / HFpEF / NYHA / Decompensated)"
+    snomed_ct: "84114007"
+    umls_cui: "C0018801"
+    target_sections: ["conclusion", "impression", "all"]
+    aho_corasick_seeds:
+      - "heart failure"
+      - "hfref"
+      - "hfpef"
+      - "congestive heart failure"
+      - "chf"
+      - "decompensated heart failure"
+      - "nyha class"
+      - "pulmonary edema"
+      - "cardiac amyloidosis"
+    regex_patterns:
+      - '(?i)\b(?:heart\s+failure|hfref|hfpef|congestive\s+heart\s+failure|chf|acute\s+decompensated|nyha\s+(?:class\s+)?[i-iv]+)\b'
+    gliner_labels:
+      - "heart failure diagnosis"
+      - "NYHA functional class"
+
+  atrial_fibrillation_arrhythmia:
+    id: "CARDIO_AFIB"
+    display_name: "Atrial Fibrillation / Atrial Flutter Arrhythmia"
+    snomed_ct: "49436004"
+    umls_cui: "C0004238"
+    target_sections: ["conclusion", "impression", "all"]
+    aho_corasick_seeds:
+      - "atrial fibrillation"
+      - "afib"
+      - "a-fib"
+      - "atrial flutter"
+      - "aflutter"
+      - "paroxysmal afib"
+      - "persistent afib"
+      - "pulmonary vein isolation"
+      - "pvi"
+    regex_patterns:
+      - '(?i)\b(?:atrial\s+fibrillation|a[\-\s]?fib|atrial\s+flutter|a[\-\s]?flutter|pulmonary\s+vein\s+isolation|pvi\s+ablation)\b'
+    gliner_labels:
+      - "atrial fibrillation or flutter"
+      - "cardiac arrhythmia"
+
+  acute_myocardial_infarction:
+    id: "CARDIO_AMI"
+    display_name: "Acute Myocardial Infarction (STEMI / NSTEMI / Unstable Angina)"
+    snomed_ct: "57054005"
+    umls_cui: "C0027051"
+    target_sections: ["conclusion", "indication", "all"]
+    aho_corasick_seeds:
+      - "stemi"
+      - "nstemi"
+      - "myocardial infarction"
+      - "acute coronary syndrome"
+      - "acs"
+      - "troponin elevation"
+      - "infarction"
+    regex_patterns:
+      - '(?i)\b(?:stemi|nstemi|st[\-\s]elevation\s+mi|non[\-\s]st[\-\s]elevation\s+mi|acute\s+myocardial\s+infarction|acute\s+coronary\s+syndrome|acs)\b'
+    gliner_labels:
+      - "acute myocardial infarction type"
+      - "acute coronary syndrome"
+
+  cardiomyopathy_myocarditis:
+    id: "CARDIO_CARDIOMYOPATHY"
+    display_name: "Cardiomyopathy (HCM / DCM / Amyloid / Myocarditis)"
+    snomed_ct: "85898001"
+    umls_cui: "C0878544"
+    target_sections: ["conclusion", "impression", "all"]
+    aho_corasick_seeds:
+      - "cardiomyopathy"
+      - "hypertrophic cardiomyopathy"
+      - "hocm"
+      - "dilated cardiomyopathy"
+      - "cardiac amyloid"
+      - "myocarditis"
+      - "sarcoidosis"
+    regex_patterns:
+      - '(?i)\b(?:hypertrophic\s+(?:obstructive\s+)?cardiomyopathy|hocm|hcm|dilated\s+cardiomyopathy|dcm|cardiac\s+amyloid(?:osis)?|myocarditis)\b'
+    gliner_labels:
+      - "cardiomyopathy type"
+      - "myocarditis"

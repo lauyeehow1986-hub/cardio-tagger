@@ -44,10 +44,16 @@ Open standard Windows Command Prompt (`cmd.exe`) in the extracted portable folde
 ```cmd
 cd cardio-tagger-portable
 
-REM Basic run over a directory of PDFs
+REM 1. Run over a directory of PDFs (outputs exact PDF paths and True/False Staged PCI indicators)
 run_cardio_tagger.bat --input-dir "C:\ClinicalData\CathReports"
 
-REM Full production run with 4 workers, Parquet export, and DuckDB checkpoint resume
+REM 2. Run over a clinical notes CSV table (preserves original columns, appends tags)
+run_cardio_tagger.bat --input-csv "C:\ClinicalData\patient_cohort.csv" --text-column clinical_note --output-csv tagged_cohort.csv
+
+REM 3. Run on specific cardiac conditions (e.g. Heart Failure, AFib, and Staged PCI)
+run_cardio_tagger.bat --input-dir "C:\ClinicalData\CathReports" --concepts staged_pci heart_failure_syndrome atrial_fibrillation_arrhythmia
+
+REM 4. Full production run with 4 workers, Parquet export, and DuckDB checkpoint resume
 run_cardio_tagger.bat --input-dir "C:\ClinicalData\CathReports" --output-csv results.csv --output-parquet results.parquet --output-jsonl detailed.jsonl --resume --workers 4
 ```
 
@@ -56,8 +62,10 @@ run_cardio_tagger.bat --input-dir "C:\ClinicalData\CathReports" --output-csv res
 ## CLI Reference & Flags
 
 ```text
-usage: cardio-tagger [-h] --input-dir INPUT_DIR [--output-csv OUTPUT_CSV]
-                     [--output-jsonl OUTPUT_JSONL] [--output-parquet OUTPUT_PARQUET]
+usage: cardio-tagger [-h] (--input-dir INPUT_DIR | --input-csv INPUT_CSV)
+                     [--text-column TEXT_COLUMN] [--id-column ID_COLUMN]
+                     [--output-csv OUTPUT_CSV] [--output-jsonl OUTPUT_JSONL]
+                     [--output-parquet OUTPUT_PARQUET]
                      [--checkpoint-db CHECKPOINT_DB] [--resume] [--workers WORKERS]
                      [--ontology ONTOLOGY] [--concepts [CONCEPTS ...]]
                      [--all-sections] [--enable-ollama]
@@ -67,39 +75,20 @@ usage: cardio-tagger [-h] --input-dir INPUT_DIR [--output-csv OUTPUT_CSV]
 
 | Argument | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `--input-dir` | Path | *Required* | Path to folder containing clinical PDFs, scanned PDFs, or text notes (`.pdf`, `.txt`, `.md`). Recursively scanned. |
-| `--output-csv` | File | `staged_pci_results.csv` | Summary CSV file containing document-level Staged PCI classification, vessels, timeframe, confidence, and page metadata. |
+| `--input-dir` | Path | *Optional* | Path to folder containing clinical PDFs, scanned PDFs, or text notes (`.pdf`, `.txt`, `.md`). Recursively scanned. |
+| `--input-csv` | File | *Optional* | Path to input tabular CSV file containing clinical notes/reports (e.g. EHR extraction tables). |
+| `--text-column` | String | *Auto-detected* | Name of column in input CSV containing report text (e.g. `report_text`, `clinical_note`, `impression`). |
+| `--id-column` | String | *Auto-detected* | Name of column in input CSV containing row ID (e.g. `patient_id`, `mrn`, `row_id`). |
+| `--output-csv` | File | `staged_pci_results.csv` | Summary CSV file containing document-level classification, condition flags, vessels, timeframe, confidence, and page metadata. |
 | `--output-parquet` | File | `staged_pci_results.parquet` | High-performance columnar Parquet file containing all structured features for analytics in DuckDB, Polars, or Python. |
 | `--output-jsonl` | File | `staged_pci_detailed.jsonl` | Line-delimited JSON with full span-level evidence, sentence matches, and multi-concept tags. |
 | `--checkpoint-db` | File | `checkpoint.duckdb` | Path to embedded DuckDB database persisting processed files and mtime hashes. |
 | `--resume` | Flag | `False` | Resumes an interrupted run. Reads `checkpoint.duckdb` and skips files matching `(pdf_path, file_size, mtime_ns)`. |
 | `--workers` | Int | `4` | Number of worker processes. Uses `maxtasksperchild=500` to guarantee zero memory leaks across 1M docs. |
 | `--ontology` | File | `cardio_concepts.yaml` | Path to declarative cardiology ontology YAML. |
-| `--concepts` | List | `None` (All) | Optional list of concept IDs to extract (e.g. `--concepts staged_pci lvef_systolic_function`). |
+| `--concepts` | List | `None` (All) | Optional subset of concept IDs to extract (e.g. `--concepts staged_pci heart_failure_syndrome atrial_fibrillation_arrhythmia`). |
 | `--all-sections` | Flag | `False` | Extends search beyond Conclusion / Impression / Plan to include History, Procedure, Hemodynamics, and Anatomy. |
 | `--enable-ollama`| Flag | `False` | Enables local Ollama CPU arbitrator on `127.0.0.1:11435` for ambiguous conditional statements. |
-
----
-
-## Common CLI Examples
-
-### 1. High-Throughput Processing with Resume Protection
-Process 100,000 PDFs using 4 workers, saving state in DuckDB so unexpected shutdowns resume instantly:
-```cmd
-run_cardio_tagger.bat --input-dir "D:\CathReports" --resume --workers 4
-```
-
-### 2. Extract Specific Cardiology Concepts
-Extract only Staged PCI and LVEF:
-```cmd
-run_cardio_tagger.bat --input-dir "D:\CathReports" --concepts staged_pci lvef_systolic_function --output-csv pci_lvef.csv
-```
-
-### 3. Comprehensive Multi-Section Scan
-Scan all sections (including procedural details and hemodynamics tables):
-```cmd
-run_cardio_tagger.bat --input-dir "D:\CathReports" --all-sections --output-parquet all_sections.parquet
-```
 
 ---
 
@@ -107,21 +96,37 @@ run_cardio_tagger.bat --input-dir "D:\CathReports" --all-sections --output-parqu
 
 The generated CSV and Parquet files contain the following clinical schema:
 
+### Core Document & Staged PCI Columns
 | Column | Type | Example | Description |
 | :--- | :--- | :--- | :--- |
-| `pdf_path` | String | `reports/cath_10492.pdf` | Source file path |
-| `total_pages` | Integer | `3` | Total pages in PDF |
-| `conclusion_found` | Boolean | `True` | Whether a conclusion section was detected |
-| `conclusion_in_early_section`| Boolean | `True` | `True` if Conclusion is on Page 1 (Executive Summary) |
-| `staged_pci_detected` | Boolean | `True` | `True` if status is Planned, Performed Index, or Conditional |
-| `staged_pci_status` | Enum | `AFFIRMED_PLANNED` | One of: `AFFIRMED_PLANNED`, `AFFIRMED_PERFORMED_INDEX`, `CONDITIONAL`, `HISTORICAL`, `NEGATED`, `NONE` |
+| `pdf_path` | String | `reports/cath_10492.pdf` | Source file path or CSV document ID (`patient_id`) |
+| `staged_pci_detected` | Boolean | **`True`** / **`False`** | **Explicit indicator: `True` if Staged PCI is present (Planned, Performed Index, or Conditional); `False` otherwise** |
+| `staged_pci_status` | Enum | `AFFIRMED_PLANNED` | Granular clinical status: `AFFIRMED_PLANNED`, `AFFIRMED_PERFORMED_INDEX`, `CONDITIONAL`, `HISTORICAL`, `NEGATED`, `NONE` |
 | `staged_pci_vessels` | String | `MID-LAD;RCA` | Extracted target coronary branches |
 | `staged_pci_timeframe` | String | `in 4 weeks` | Extracted staging timeframe |
 | `staged_pci_confidence`| Float | `0.99` | Sieve confidence score (0.0 to 1.0) |
-| `matched_concepts_count` | Integer | `4` | Total cardiology concepts matched |
+| `detected_cardio_concepts`| String | `CARDIO_AMI;CARDIO_STAGED_PCI` | Semicolon-delimited list of all affirmed cardiology concepts |
+| `conclusion_found` | Boolean | `True` | Whether a conclusion section was detected |
+| `total_pages` | Integer | `3` | Total pages in PDF (or 1 for CSV note) |
 | `peak_tier_used` | String | `Tier3_GLiNER_BioMed` | Highest sieve tier invoked for this report |
 | `processing_ms` | Float | `2.84` | Wall-clock processing time in milliseconds |
-| `used_ocr_fallback` | Boolean | `False` | `True` if RapidOCR was triggered for scanned pages |
+
+### Multi-Cardiology Condition Columns (for Every Concept in Ontology)
+For each active condition, the output includes two dedicated columns:
+- `has_<concept_name>`: Boolean (`True` / `False`) indicating presence of that condition
+- `<concept_name>_status`: Clinical assertion status (`AFFIRMED`, `AFFIRMED_PLANNED`, `CONDITIONAL`, `HISTORICAL`, `NEGATED`, `NONE`)
+
+Examples:
+- `has_heart_failure_syndrome` & `heart_failure_syndrome_status`
+- `has_atrial_fibrillation_arrhythmia` & `atrial_fibrillation_arrhythmia_status`
+- `has_acute_myocardial_infarction` & `acute_myocardial_infarction_status`
+- `has_cabg_evaluation` & `cabg_evaluation_status`
+- `has_lvef_systolic_function` & `lvef_systolic_function_status`
+- `has_coronary_vessel_stenosis` & `coronary_vessel_stenosis_status`
+- `has_cardiomyopathy_myocarditis` & `cardiomyopathy_myocarditis_status`
+- `has_structural_valvular_intervention` & `structural_valvular_intervention_status`
+
+When `--input-csv` is used, all original columns from your input CSV (e.g. `patient_id`, `mrn`, `age`, `encounter_date`) are **100% preserved**, and these clinical tagger columns are appended directly.
 
 ---
 
@@ -138,6 +143,10 @@ Concepts are defined declaratively in `portable_app/cardio_tagger/ontology/cardi
 - `structural_valvular_intervention` (TAVR, MitraClip)
 - `mechanical_circulatory_support` (Impella, IABP, ECMO)
 - `dapt_antithrombotic_regimen`
+- `heart_failure_syndrome` (HFrEF, HFpEF, CHF, NYHA class)
+- `atrial_fibrillation_arrhythmia` (AFib, Atrial Flutter, PVI ablation)
+- `acute_myocardial_infarction` (STEMI, NSTEMI, Unstable Angina, ACS)
+- `cardiomyopathy_myocarditis` (HCM/HOCM, DCM, Amyloidosis, Myocarditis)
 
 ---
 
