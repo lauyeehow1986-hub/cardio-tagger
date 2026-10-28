@@ -323,3 +323,84 @@ def test_method_priority_3d_over_2d_over_visual_over_unspecified():
     assert r4.lvef_numeric == 52.0
     assert r4.lvef_method == "UNSPECIFIED"
 
+
+def test_edge_case_ava_3d_planimetry_not_lvef():
+    parser = ClinicalSectionParser()
+    extractor = EchoLVEFExtractor()
+
+    # User edge case 1:
+    # "AVA by 3D planimetry 1.81 cm2(0.94 cm2/m2) where it take it as lvef 94%
+    # whereas there is a Visually Estimated LVEF 55-60% which was missed."
+    text = (
+        "CONCLUSION:\n"
+        "1. Moderate aortic stenosis. AVA by 3D planimetry 1.81 cm2(0.94 cm2/m2).\n"
+        "2. Visually Estimated LVEF 55-60%.\n"
+        "3. Mild concentric left ventricular hypertrophy."
+    )
+    doc = parser.parse_pages("ava_test.txt", [text])
+    res = extractor.extract(doc)
+    assert res.lvef_extracted == "55-60%", f"Expected 55-60%, got {res.lvef_extracted}"
+    assert res.lvef_numeric == 57.5
+    assert res.lvef_method == "VISUAL"
+    assert res.lvef_section == "CONCLUSION"
+
+
+def test_edge_case_multipage_conclusion_continuation():
+    parser = ClinicalSectionParser()
+    extractor = EchoLVEFExtractor()
+
+    # User edge case 2:
+    # "conclusion was on an earlier page but the lvef was on next page as the conclusion
+    # was too long LVEF 35 to 40%\n(visual estimate)."
+    page1 = (
+        "ECHOCARDIOGRAM REPORT\n\n"
+        "FINDINGS:\n"
+        "Left ventricle is moderately dilated.\n\n"
+        "CONCLUSION:\n"
+        "1. Dilated cardiomyopathy with global hypokinesis.\n"
+        "2. Moderate functional mitral regurgitation."
+    )
+    page2 = (
+        "3. LVEF 35 to 40%\n"
+        "(visual estimate).\n"
+        "4. No intracardiac thrombus or pericardial effusion.\n\n"
+        "Signed by: Dr. Cardiologist, MD"
+    )
+    doc = parser.parse_pages("multipage_echo.txt", [page1, page2])
+    res = extractor.extract(doc)
+    assert res.lvef_extracted == "35-40%", f"Expected 35-40%, got {res.lvef_extracted}"
+    assert res.lvef_numeric == 37.5
+    assert res.lvef_method == "VISUAL", f"Expected VISUAL, got {res.lvef_method}"
+    assert res.lvef_section == "CONCLUSION", f"Expected CONCLUSION, got {res.lvef_section}"
+
+
+def test_edge_case_reference_range_not_extracted():
+    parser = ClinicalSectionParser()
+    extractor = EchoLVEFExtractor()
+
+    # User edge case 3:
+    # "lvef value in measurement lvef simpson biplane 60%. [N:53-75] and 53-75 was taken as LVEF %"
+    text1 = (
+        "MEASUREMENTS:\n"
+        "LVEF Simpson biplane 60%. [N:53-75]\n"
+        "LVEDV: 112 ml\n"
+        "LVESV: 45 ml\n"
+    )
+    doc1 = parser.parse_pages("ref1.txt", [text1])
+    res1 = extractor.extract(doc1)
+    assert res1.lvef_extracted == "60%", f"Expected 60%, got {res1.lvef_extracted}"
+    assert res1.lvef_numeric == 60.0
+    assert res1.lvef_method == "2D_BIPLANE"
+
+    # Also test with other reference range brackets e.g. (Normal: 53-75%)
+    text2 = (
+        "MEASUREMENTS:\n"
+        "LVEF (Biplane) 58% (Normal: 52-72%)\n"
+    )
+    doc2 = parser.parse_pages("ref2.txt", [text2])
+    res2 = extractor.extract(doc2)
+    assert res2.lvef_extracted == "58%", f"Expected 58%, got {res2.lvef_extracted}"
+    assert res2.lvef_numeric == 58.0
+    assert res2.lvef_method == "2D_BIPLANE"
+
+

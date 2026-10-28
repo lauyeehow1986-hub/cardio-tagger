@@ -47,11 +47,28 @@ class EchoLVEFExtractor:
     """
 
     # Primary numerical LVEF pattern: captures 55%, 50-55%, 50 to 55%, 50% to 55%, 50-55, 50 to 50, >55%, <35%
+    # Uses negative lookaround to prevent matching decimals (e.g. 0.94 cm2/m2) as integer percentages
     LVEF_NUMERIC_PATTERN = re.compile(
         r"(?i)(?:between\s+)?(?P<prefix>>|<|>=|<=|~|approx\.?|approximately|greater\s+than|less\s+than)?\s*"
-        r"(?P<low>[0-9]{2})\s*(?:%|percent)?\s*"
-        r"(?:(?:[\-–—]|(?:\s*(?:to|and)\s*))\s*(?P<high>[0-9]{2})\s*(?:%|percent)?)?"
+        r"(?<![\.\d])(?P<low>[0-9]{2})(?!\.[0-9])\s*(?:%|percent)?\s*"
+        r"(?:(?:[\-–—]|(?:\s*(?:to|and)\s*))\s*(?<![\.\d])(?P<high>[0-9]{2})(?!\.[0-9])\s*(?:%|percent)?)?"
         r"(?:\s*%)?"
+    )
+
+    REJECTED_UNITS_PATTERN = re.compile(
+        r"^\s*(?:cm(?:2|²|3|³)?(?:\s*/\s*m(?:2|²))?|mm(?:2|²|3|³)?|m(?:2|²)|"
+        r"ml(?:\s*/\s*m(?:2|²))?|l\s*/\s*min|m/s(?:ec)?|cm/s(?:ec)?|"
+        r"mmhg|bpm|kg|ms|sec|seconds?|years?|yo|yr|g/m(?:2|²)?|kpa)\b",
+        re.IGNORECASE,
+    )
+
+    REFERENCE_RANGE_PREFIX = re.compile(
+        r"(?i)(?:\[|\(|\b)(?:N|NL|Normal|Ref|Reference|Norm)\s*(?:range)?\s*[:=\s]\s*$"
+    )
+
+    REFERENCE_RANGE_BRACKETS = re.compile(
+        r"(?i)(?:\[|\()\s*(?:N|NL|Normal|Ref|Reference|Norm)\s*(?:range)?\s*[:=\s]\s*"
+        r"[0-9]{2}(?:\s*(?:[\-–—]|to|and)\s*[0-9]{2})?\s*%?\s*(?:\]|\))"
     )
 
     # Comparative sentence pattern: "improved from 30% in 2022 to 55% today"
@@ -235,8 +252,12 @@ class EchoLVEFExtractor:
             if not self._is_lvef_context(stmt_lower):
                 continue
 
+            # Strip reference / normal ranges (e.g. [N:53-75], (Normal: 53-75%))
+            # so machine template values are never confused with patient measurements
+            stmt_cleaned = self.REFERENCE_RANGE_BRACKETS.sub("", stmt)
+
             # Check for comparative sentence: "improved from 30% in 2022 to 55% today"
-            comp_match = self.COMPARATIVE_PATTERN.search(stmt)
+            comp_match = self.COMPARATIVE_PATTERN.search(stmt_cleaned)
             if comp_match:
                 prior_val = comp_match.group("prior")
                 curr_val = comp_match.group("current")
@@ -278,7 +299,7 @@ class EchoLVEFExtractor:
                 continue
 
             # Standard numeric scan in statement
-            for m in self.LVEF_NUMERIC_PATTERN.finditer(stmt):
+            for m in self.LVEF_NUMERIC_PATTERN.finditer(stmt_cleaned):
                 raw_match = m.group(0).strip()
                 prefix = m.group("prefix")
                 low_str = m.group("low")
@@ -301,13 +322,17 @@ class EchoLVEFExtractor:
 
                 # Context around this specific match
                 start_idx = max(0, m.start() - 50)
-                end_idx = min(len(stmt), m.end() + 50)
-                local_window = stmt[start_idx:end_idx]
-                before_match = stmt[start_idx:m.start()].lower()
-                after_match = stmt[m.end():end_idx].lower()
+                end_idx = min(len(stmt_cleaned), m.end() + 50)
+                local_window = stmt_cleaned[start_idx:end_idx]
+                before_match = stmt_cleaned[start_idx:m.start()].lower()
+                after_match = stmt_cleaned[m.end():end_idx].lower()
 
-                # If there was no % in the raw match, verify it is not followed by non-LVEF units (mmHg, ml, etc.)
-                if re.match(r"^\s*(?:mmhg|bpm|kg|cm|mm|ml|ms|years?|yo|yr|m/s|g/m)\b", after_match):
+                # Discard match if preceded by normal / reference range tag (e.g. N: 53-75)
+                if self.REFERENCE_RANGE_PREFIX.search(before_match):
+                    continue
+
+                # Discard match if followed by non-LVEF clinical units (cm2, mmhg, ml, etc.)
+                if self.REJECTED_UNITS_PATTERN.match(after_match):
                     continue
 
                 is_hist = self._is_historical(stmt, local_window, before_match, after_match)
@@ -392,12 +417,17 @@ class EchoLVEFExtractor:
         return False
 
     def _is_lvef_context(self, text_lower: str) -> bool:
+        # Exclude explicit non-ventricular valve area statements that don't mention EF
+        if re.search(r"(?i)\b(?:ava|mva|tva|pva|aortic\s+valve\s+area|mitral\s+valve\s+area|planimetry)\b", text_lower):
+            if not re.search(r"(?i)\b(?:lvef|ef|ejection\s+fraction|systolic\s+function)\b", text_lower):
+                return False
+
         return bool(
             re.search(r"(?i)\b(?:lvef|ef|ejection\s+fraction|systolic\s+function|lv\s+function)\b", text_lower)
             or "biplane" in text_lower
             or "simpson" in text_lower
             or "teich" in text_lower
-            or "3d" in text_lower
+            or re.search(r"(?i)\b3[\-\s]?d\s+(?:lvef|ef|ejection|volume|volumes|auto|full|quantification)\b", text_lower)
         )
 
     def _parse_lvef_value(self, raw_str: str) -> Tuple[str, Optional[float]]:

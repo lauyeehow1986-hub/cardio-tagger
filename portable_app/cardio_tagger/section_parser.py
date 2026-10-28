@@ -182,14 +182,20 @@ class ClinicalSectionParser:
         )
 
         total_doc_len = len(full_text)
+        last_open_section: Optional[ExtractedSection] = None
 
         # Inspect ALL pages because Conclusion may appear on Page 1 or final page
         for idx, page_raw in enumerate(page_texts):
             page_num = idx + 1
             normalized = self._normalize_delimiters(page_raw)
-            sections_on_page = self._extract_sections_from_text(
-                normalized, page_num=page_num, total_pages=total_pages, total_doc_len=total_doc_len
+            sections_on_page, open_sec = self._extract_sections_from_text(
+                normalized,
+                page_num=page_num,
+                total_pages=total_pages,
+                total_doc_len=total_doc_len,
+                continued_from=last_open_section,
             )
+            last_open_section = open_sec
             for sec in sections_on_page:
                 doc.all_sections.setdefault(sec.section_type, []).append(sec)
                 if sec.section_type in ("conclusion", "plan"):
@@ -227,8 +233,13 @@ class ClinicalSectionParser:
         return cleaned
 
     def _extract_sections_from_text(
-        self, text: str, page_num: int, total_pages: int, total_doc_len: int = 0
-    ) -> List[ExtractedSection]:
+        self,
+        text: str,
+        page_num: int,
+        total_pages: int,
+        total_doc_len: int = 0,
+        continued_from: Optional[ExtractedSection] = None,
+    ) -> Tuple[List[ExtractedSection], Optional[ExtractedSection]]:
         boundaries: List[Tuple[int, int, str, str]] = []
 
         # 1. Find conclusion headers
@@ -247,6 +258,17 @@ class ClinicalSectionParser:
             boundaries.append((m.start(), m.end(), "_stop_", m.group(0).strip()))
 
         boundaries.sort(key=lambda x: x[0])
+
+        # Cross-page continuation: If there is an open section from previous page,
+        # attach any leading text before the first boundary on this page to it.
+        first_b_start = boundaries[0][0] if boundaries else len(text)
+        continuation_chunk = text[:first_b_start].strip(" :-\n\t")
+        if continued_from is not None and continuation_chunk:
+            continued_from.text = f"{continued_from.text}\n{continuation_chunk}"
+            continued_from.char_end += len(continuation_chunk)
+            if page_num == total_pages and (not boundaries or boundaries[0][2] == "_stop_"):
+                continued_from.is_early_section = False
+
         extracted: List[ExtractedSection] = []
 
         for i, (start_idx, content_start, sec_type, header_str) in enumerate(boundaries):
@@ -288,4 +310,16 @@ class ClinicalSectionParser:
                 )
             )
 
-        return extracted
+        # Determine if a section remains open at the bottom of this page
+        open_section: Optional[ExtractedSection] = None
+        last_boundary = boundaries[-1] if boundaries else None
+        has_trailing_stop = bool(last_boundary and last_boundary[2] == "_stop_")
+
+        if not has_trailing_stop:
+            if extracted:
+                if extracted[-1].char_end >= len(text):
+                    open_section = extracted[-1]
+            elif continued_from is not None and not boundaries:
+                open_section = continued_from
+
+        return extracted, open_section
