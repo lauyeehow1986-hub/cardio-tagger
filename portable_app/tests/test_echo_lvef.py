@@ -161,3 +161,52 @@ def test_case7_qualitative_fallback():
     assert res.lvef_numeric is None
     assert res.lvef_method == "QUALITATIVE"
     assert res.lvef_section == "CONCLUSION"
+
+
+def test_visually_estimated_variations():
+    parser = ClinicalSectionParser()
+    extractor = EchoLVEFExtractor()
+    variations = [
+        "CONCLUSION: Visually estimated lvef 45-50%.",
+        "CONCLUSION: Visually estimated lvef 45 to 50%.",
+        "CONCLUSION: Visually estimated lvef 45% to 50%.",
+        "CONCLUSION: Visually estimated lvef 45-50.",
+        "CONCLUSION: Visually estimated lvef 45 to 50.",
+        "CONCLUSION: Visually estimated lvef between 45 and 50%.",
+        "CONCLUSION: Visually estimated LVEF is 45 to 50%.",
+        "CONCLUSION: 2D echocardiogram. Visually estimated LVEF 45 to 50%.",
+    ]
+    for text in variations:
+        doc = parser.parse_pages("var.txt", [text])
+        res = extractor.extract(doc)
+        assert res.lvef_extracted == "45-50%", f"Failed for {text}: got {res.lvef_extracted}"
+        assert res.lvef_numeric == 47.5, f"Failed for {text}: got {res.lvef_numeric}"
+        assert res.lvef_method == "VISUAL", f"Failed for {text}: got {res.lvef_method}"
+        assert res.lvef_section == "CONCLUSION"
+
+
+def test_method_priority_3d_over_2d_over_visual():
+    parser = ClinicalSectionParser()
+    extractor = EchoLVEFExtractor()
+
+    # In Conclusion: 3D, 2D, and Visual -> 3D wins
+    t1 = "CONCLUSION:\n1. 3D LVEF: 55%.\n2. 2D Biplane Simpson's: 50%.\n3. Visually estimated LVEF: 45 to 50%."
+    d1 = parser.parse_pages("t1.txt", [t1])
+    r1 = extractor.extract(d1)
+    assert r1.lvef_extracted == "55%"
+    assert r1.lvef_method == "3D"
+
+    # In Conclusion: 2D and Visual -> 2D wins
+    t2 = "CONCLUSION:\n1. 2D Biplane Simpson's LVEF: 50%.\n2. Visually estimated LVEF 45 to 50%."
+    d2 = parser.parse_pages("t2.txt", [t2])
+    r2 = extractor.extract(d2)
+    assert r2.lvef_extracted == "50%"
+    assert r2.lvef_method == "2D_BIPLANE"
+
+    # In Conclusion: only Visual -> Visual wins
+    t3 = "CONCLUSION:\nVisually estimated LVEF 45 to 50%."
+    d3 = parser.parse_pages("t3.txt", [t3])
+    r3 = extractor.extract(d3)
+    assert r3.lvef_extracted == "45-50%"
+    assert r3.lvef_method == "VISUAL"
+

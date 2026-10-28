@@ -46,18 +46,19 @@ class EchoLVEFExtractor:
     echocardiography reports, enforcing clinical section priority and method hierarchy.
     """
 
-    # Primary numerical LVEF pattern: captures 55%, 50-55%, 50 to 55%, >55%, <35%
+    # Primary numerical LVEF pattern: captures 55%, 50-55%, 50 to 55%, 50% to 55%, 50-55, 50 to 50, >55%, <35%
     LVEF_NUMERIC_PATTERN = re.compile(
-        r"(?i)(?P<prefix>>|<|>=|<=|~|approx\.?|approximately)?\s*"
-        r"(?P<low>[0-9]{2})\s*"
-        r"(?:(?:[\-–—]|(?:\s+to\s+))\s*(?P<high>[0-9]{2}))?\s*%"
+        r"(?i)(?:between\s+)?(?P<prefix>>|<|>=|<=|~|approx\.?|approximately|greater\s+than|less\s+than)?\s*"
+        r"(?P<low>[0-9]{2})\s*(?:%|percent)?\s*"
+        r"(?:(?:[\-–—]|(?:\s*(?:to|and)\s*))\s*(?P<high>[0-9]{2})\s*(?:%|percent)?)?"
+        r"(?:\s*%)?"
     )
 
     # Comparative sentence pattern: "improved from 30% in 2022 to 55% today"
     COMPARATIVE_PATTERN = re.compile(
         r"(?i)(?:improved|increased|decreased|reduced|worsened|changed)\s+"
-        r"(?:from\s+)?(?P<prior>[0-9]{2}(?:\s*[\-–—]\s*[0-9]{2})?\s*%)\s*"
-        r"[^.;\n]*?\s+(?:to\s+)(?P<current>[0-9]{2}(?:\s*[\-–—]\s*[0-9]{2})?\s*%)"
+        r"(?:from\s+)?(?P<prior>[0-9]{2}(?:\s*(?:[\-–—]|to|and)\s*[0-9]{2})?\s*%?)\s*"
+        r"[^.;\n]*?\s+(?:to\s+)(?P<current>[0-9]{2}(?:\s*(?:[\-–—]|to|and)\s*[0-9]{2})?\s*%?)"
     )
 
     HISTORICAL_TERMS = [
@@ -174,7 +175,13 @@ class EchoLVEFExtractor:
 
                 # The current value is current
                 parsed_curr, mid_curr = self._parse_lvef_value(curr_val)
-                method, rank = self._determine_method(stmt_lower, curr_val)
+                method, rank = self._determine_method(
+                    local_window=stmt_lower,
+                    before_match=stmt_lower,
+                    after_match="",
+                    val_match_str=curr_val,
+                    has_high="-" in curr_val or "to" in curr_val,
+                )
                 candidates.append(
                     EchoLVEFCandidate(
                         raw_text=parsed_curr,
@@ -202,6 +209,8 @@ class EchoLVEFExtractor:
 
                 if high_str:
                     high_val = float(high_str)
+                    if not (5 <= high_val <= 95):
+                        continue
                     midpoint = round((low_val + high_val) / 2.0, 1)
                     raw_formatted = f"{int(low_val)}-{int(high_val)}%"
                 else:
@@ -209,12 +218,24 @@ class EchoLVEFExtractor:
                     raw_formatted = f"{prefix or ''}{int(low_val)}%"
 
                 # Context around this specific match
-                start_idx = max(0, m.start() - 40)
-                end_idx = min(len(stmt), m.end() + 40)
+                start_idx = max(0, m.start() - 50)
+                end_idx = min(len(stmt), m.end() + 50)
                 local_window = stmt[start_idx:end_idx]
+                before_match = stmt[start_idx:m.start()].lower()
+                after_match = stmt[m.end():end_idx].lower()
 
-                is_hist = self._is_historical(stmt, local_window)
-                method, rank = self._determine_method(stmt_lower, raw_match)
+                # If there was no % in the raw match, verify it is not followed by non-LVEF units (mmHg, ml, etc.)
+                if re.match(r"^\s*(?:mmhg|bpm|kg|cm|mm|ml|ms|years?|yo|yr|m/s|g/m)\b", after_match):
+                    continue
+
+                is_hist = self._is_historical(stmt, local_window, before_match, after_match)
+                method, rank = self._determine_method(
+                    local_window=local_window.lower(),
+                    before_match=before_match,
+                    after_match=after_match,
+                    val_match_str=raw_match,
+                    has_high=bool(high_str),
+                )
 
                 candidates.append(
                     EchoLVEFCandidate(
@@ -230,46 +251,61 @@ class EchoLVEFExtractor:
 
         return candidates
 
-    def _determine_method(self, text_lower: str, val_match_str: str) -> Tuple[str, int]:
+    def _determine_method(
+        self,
+        local_window: str,
+        before_match: str,
+        after_match: str,
+        val_match_str: str,
+        has_high: bool,
+    ) -> Tuple[str, int]:
         """
         Determines the acquisition method and assigns strict priority rank:
         1: 3D
-        2: 2D (Biplane, Simpson, Teichholz, Auto-EF)
+        2: 2D (Biplane, Simpson, Teichholz, Auto-EF, 2D Quantitative)
         3: UNSPECIFIED (Numeric without visual marker)
         4: VISUAL (Eyeball, Estimated, Range without 2D/3D tag)
         """
-        # Rank 1: 3D
-        if re.search(r"(?i)\b(?:3[\-\s]?d|tri[\-\s]?plane|3[\-\s]?d\s+(?:auto|simpson|volume))\b", text_lower):
+        nearby = f"{before_match} {after_match}"
+
+        # 1. Explicit 3D (Rank 1)
+        if re.search(r"(?i)\b(?:3[\-\s]?d|tri[\-\s]?plane|3[\-\s]?d\s+(?:auto|simpson|volume|full))\b", nearby):
             return "3D", 1
 
-        # Rank 2: 2D Biplane / Simpson / Auto-EF / Teichholz
-        if re.search(r"(?i)\b(?:biplane|simpson(?:'s)?|modified\s+simpson|method\s+of\s+discs|auto[\-\s]?ef)\b", text_lower):
+        # 2. Explicit Visual / Eyeball / Estimated (Rank 4)
+        # If explicitly marked as visual/estimated (e.g. "visually estimated lvef 45 to 50%"),
+        # visual classification takes precedence even if the broader sentence mentioned 2D Echo.
+        if re.search(r"(?i)\b(?:visual(?:ly)?|eyeball|estimated?|semi[\-\s]?quantitative)\b", nearby):
+            return "VISUAL", 4
+
+        # 3. Explicit 2D Biplane / Simpson / Auto-EF (Rank 2)
+        if re.search(r"(?i)\b(?:biplane|simpson(?:'s)?|modified\s+simpson|method\s+of\s+discs|auto[\-\s]?ef)\b", nearby):
             return "2D_BIPLANE", 2
 
-        if re.search(r"(?i)\b(?:teich(?:holz)?|m[\-\s]?mode)\b", text_lower):
+        # 4. Explicit 2D Teichholz / M-mode (Rank 2)
+        if re.search(r"(?i)\b(?:teich(?:holz)?|m[\-\s]?mode)\b", nearby):
             return "2D_TEICHHOLZ", 2
 
-        if re.search(r"(?i)\b(?:2[\-\s]?d(?:\s+echo)?|quantitative)\b", text_lower):
+        # 5. Explicit 2D Quantitative directly preceding LVEF (Rank 2)
+        if re.search(r"(?i)\b(?:2[\-\s]?d(?:\s+lvef|\s+ef)?|quantitative)\b", before_match):
             return "2D", 2
 
-        # Rank 4: Visual Estimate / Eyeball
-        if re.search(r"(?i)\b(?:visual(?:ly)?|eyeball|estimated?|semi[\-\s]?quantitative)\b", text_lower):
+        # 6. Any range without 2D/3D tag is clinically an estimated visual range (Rank 4)
+        if has_high or re.search(r"[0-9]{2}\s*(?:[\-–—]|(?:\s*(?:to|and)\s*))\s*[0-9]{2}", val_match_str):
             return "VISUAL", 4
 
-        # If it's a range (e.g. 50-55%) without explicit 2D/3D tag, clinically it's an estimated visual range
-        if re.search(r"[0-9]{2}\s*(?:[\-–—]|(?:\s+to\s+))\s*[0-9]{2}", val_match_str):
-            return "VISUAL", 4
-
-        # Rank 3: Unspecified
+        # 7. Unspecified numeric value (Rank 3)
         return "UNSPECIFIED", 3
 
-    def _is_historical(self, full_stmt: str, local_window: str) -> bool:
+    def _is_historical(
+        self, full_stmt: str, local_window: str, before_match: str = "", after_match: str = ""
+    ) -> bool:
         """
         Returns True if the candidate is attributed to a prior historical examination.
         """
-        target = f"{full_stmt} {local_window}"
+        nearby = f"{before_match} {after_match}" if before_match or after_match else local_window
         for pat in self.HISTORICAL_TERMS:
-            if pat.search(target):
+            if pat.search(nearby):
                 return True
         return False
 
