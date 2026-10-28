@@ -128,7 +128,7 @@ class EchoLVEFExtractor:
             )
             is_prev_lvef = bool(
                 re.search(
-                    r"(?i)\b(?:lvef|ef|ejection\s+fraction|lv\s+systolic\s+function|visually\s+estimated)\b",
+                    r"(?i)\b(?:lvef|ef)(?=[0-9><=:~]|\b)|(?:ejection\s+fraction|lv\s+systolic\s+function|visually\s+estimated)\b",
                     prev,
                 )
             )
@@ -394,7 +394,7 @@ class EchoLVEFExtractor:
             return "2D_TEICHHOLZ", 2
 
         # 5. Explicit 2D Quantitative directly preceding LVEF (Rank 2)
-        if re.search(r"(?i)\b(?:2[\-\s]?d(?:\s+lvef|\s+ef)?|quantitative)\b", before_match):
+        if re.search(r"(?i)\b(?:2[\-\s]?d(?:\s*lvef|\s*ef)?|quantitative)\b", before_match):
             return "2D", 2
 
         # 6. Any range without 2D/3D tag is clinically an estimated visual range (Rank 3)
@@ -419,11 +419,11 @@ class EchoLVEFExtractor:
     def _is_lvef_context(self, text_lower: str) -> bool:
         # Exclude explicit non-ventricular valve area statements that don't mention EF
         if re.search(r"(?i)\b(?:ava|mva|tva|pva|aortic\s+valve\s+area|mitral\s+valve\s+area|planimetry)\b", text_lower):
-            if not re.search(r"(?i)\b(?:lvef|ef|ejection\s+fraction|systolic\s+function)\b", text_lower):
+            if not re.search(r"(?i)\b(?:lvef|ef)(?=[0-9><=:~]|\b)|(?:ejection\s+fraction|systolic\s+function)\b", text_lower):
                 return False
 
         return bool(
-            re.search(r"(?i)\b(?:lvef|ef|ejection\s+fraction|systolic\s+function|lv\s+function)\b", text_lower)
+            re.search(r"(?i)\b(?:lvef|ef)(?=[0-9><=:~]|\b)|(?:ejection\s+fraction|systolic\s+function|lv\s+function)\b", text_lower)
             or "biplane" in text_lower
             or "simpson" in text_lower
             or "teich" in text_lower

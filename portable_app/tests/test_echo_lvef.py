@@ -404,3 +404,34 @@ def test_edge_case_reference_range_not_extracted():
     assert res2.lvef_method == "2D_BIPLANE"
 
 
+def test_edge_case_unspaced_ef_and_wall_motion():
+    parser = ClinicalSectionParser()
+    extractor = EchoLVEFExtractor()
+
+    # User edge case:
+    # "EF35-40% Regional wall motion abnormalities"
+    t1 = "CONCLUSION:\nEF35-40% Regional wall motion abnormalities"
+    d1 = parser.parse_pages("ef_unspaced.txt", [t1])
+    r1 = extractor.extract(d1)
+    assert r1.lvef_extracted == "35-40%", f"Expected 35-40%, got {r1.lvef_extracted}"
+    assert r1.lvef_numeric == 37.5
+    assert r1.lvef_method == "VISUAL"
+    assert r1.lvef_section == "CONCLUSION"
+
+    # Variations: LVEF unspaced, EF single value, EF with colon
+    t2 = "CONCLUSION:\nLVEF35-40% Regional wall motion abnormalities"
+    d2 = parser.parse_pages("lvef_unspaced.txt", [t2])
+    r2 = extractor.extract(d2)
+    assert r2.lvef_extracted == "35-40%", f"Expected 35-40%, got {r2.lvef_extracted}"
+    assert r2.lvef_numeric == 37.5
+    assert r2.lvef_method == "VISUAL"
+
+    t3 = "CONCLUSION:\nEF45% Regional wall motion abnormalities"
+    d3 = parser.parse_pages("ef_single.txt", [t3])
+    r3 = extractor.extract(d3)
+    assert r3.lvef_extracted == "45%", f"Expected 45%, got {r3.lvef_extracted}"
+    assert r3.lvef_numeric == 45.0
+    assert r3.lvef_method == "UNSPECIFIED"
+
+
+
