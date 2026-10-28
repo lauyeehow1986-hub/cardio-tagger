@@ -185,6 +185,93 @@ def test_visually_estimated_variations():
         assert res.lvef_section == "CONCLUSION"
 
 
+def test_newline_edge_cases():
+    parser = ClinicalSectionParser()
+    extractor = EchoLVEFExtractor()
+
+    # Case A: Value on line 1, parenthetical qualifier on line 2
+    # "LVEF 35 to 40%\n(visual estimate)."
+    t_a = "CONCLUSION:\nLVEF 35 to 40%\n(visual estimate)."
+    d_a = parser.parse_pages("ta.txt", [t_a])
+    r_a = extractor.extract(d_a)
+    assert r_a.lvef_extracted == "35-40%", f"Expected 35-40%, got {r_a.lvef_extracted}"
+    assert r_a.lvef_numeric == 37.5
+    assert r_a.lvef_method == "VISUAL", f"Expected VISUAL, got {r_a.lvef_method}"
+    assert r_a.lvef_section == "CONCLUSION"
+
+    # Single value with newline visual estimate
+    t_a2 = "CONCLUSION:\nLVEF 40%\n(visual estimate)."
+    d_a2 = parser.parse_pages("ta2.txt", [t_a2])
+    r_a2 = extractor.extract(d_a2)
+    assert r_a2.lvef_extracted == "40%"
+    assert r_a2.lvef_numeric == 40.0
+    assert r_a2.lvef_method == "VISUAL", f"Expected VISUAL, got {r_a2.lvef_method}"
+
+    # Case B: Context on line 1, value with indented whitespace on line 2
+    # "Visually estimated LVEF \n               45-50%"
+    t_b = "CONCLUSION:\nVisually estimated LVEF \n               45-50%"
+    d_b = parser.parse_pages("tb.txt", [t_b])
+    r_b = extractor.extract(d_b)
+    assert r_b.lvef_extracted == "45-50%", f"Expected 45-50%, got {r_b.lvef_extracted}"
+    assert r_b.lvef_numeric == 47.5
+    assert r_b.lvef_method == "VISUAL", f"Expected VISUAL, got {r_b.lvef_method}"
+    assert r_b.lvef_section == "CONCLUSION"
+
+    # Case C: Context on line 1, value directly on line 2
+    # "Visually estimated LVEF\n45-50%."
+    t_c = "CONCLUSION:\nVisually estimated LVEF\n45-50%."
+    d_c = parser.parse_pages("tc.txt", [t_c])
+    r_c = extractor.extract(d_c)
+    assert r_c.lvef_extracted == "45-50%", f"Expected 45-50%, got {r_c.lvef_extracted}"
+    assert r_c.lvef_numeric == 47.5
+    assert r_c.lvef_method == "VISUAL", f"Expected VISUAL, got {r_c.lvef_method}"
+    assert r_c.lvef_section == "CONCLUSION"
+
+    # Case D: Numbered list item with wrap
+    t_d = (
+        "CONCLUSION:\n"
+        "1. Visually estimated LVEF\n"
+        "   45-50%.\n"
+        "2. Severe mitral regurgitation."
+    )
+    d_d = parser.parse_pages("td.txt", [t_d])
+    r_d = extractor.extract(d_d)
+    assert r_d.lvef_extracted == "45-50%"
+    assert r_d.lvef_numeric == 47.5
+    assert r_d.lvef_method == "VISUAL"
+    assert r_d.lvef_section == "CONCLUSION"
+
+    # Case E: Colon with next-line visual estimate
+    t_e = "CONCLUSION:\nVisually estimated LVEF:\n45 to 50%"
+    d_e = parser.parse_pages("te.txt", [t_e])
+    r_e = extractor.extract(d_e)
+    assert r_e.lvef_extracted == "45-50%"
+    assert r_e.lvef_numeric == 47.5
+    assert r_e.lvef_method == "VISUAL"
+
+    # Case F: Numeric on line 1, unparenthesized "Visual estimate." on line 2
+    t_f = "CONCLUSION:\nLVEF: 40%\nVisual estimate."
+    d_f = parser.parse_pages("tf.txt", [t_f])
+    r_f = extractor.extract(d_f)
+    assert r_f.lvef_extracted == "40%"
+    assert r_f.lvef_numeric == 40.0
+    assert r_f.lvef_method == "VISUAL"
+
+    # Case G: Numbered item with next line qualifier surrounded by other findings
+    t_g = (
+        "CONCLUSION:\n"
+        "1. 2D echocardiogram.\n"
+        "2. LVEF 35 to 40%\n"
+        "   (visual estimate).\n"
+        "3. No pericardial effusion."
+    )
+    d_g = parser.parse_pages("tg.txt", [t_g])
+    r_g = extractor.extract(d_g)
+    assert r_g.lvef_extracted == "35-40%"
+    assert r_g.lvef_numeric == 37.5
+    assert r_g.lvef_method == "VISUAL"
+
+
 def test_method_priority_3d_over_2d_over_visual_over_unspecified():
     parser = ClinicalSectionParser()
     extractor = EchoLVEFExtractor()

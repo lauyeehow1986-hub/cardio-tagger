@@ -76,6 +76,92 @@ class EchoLVEFExtractor:
         (re.compile(r"(?i)\bseverely\s+reduced\s+(?:lv\s+systolic\s+function|lvef|ef)\b"), "Severely reduced"),
     ]
 
+    FIELD_LABEL_PATTERN = re.compile(r"^[A-Za-z0-9_\-\s/()]{2,25}:(?!\s*$)")
+    LIST_ITEM_PATTERN = re.compile(r"^(?:[0-9]{1,2}[\.\)]|[•\-\*■]|\([a-z0-9]\))\s+", re.IGNORECASE)
+    METHOD_MODIFIER_PATTERN = re.compile(
+        r"^(?:\(?\s*(?:visual(?:ly)?(?:\s+estimate[ds]?)?|eyeball(?:\s+estimate[ds]?)?|estimated?|"
+        r"biplane|simpson(?:'s)?|teichholz|m[\-\s]?mode|auto[\-\s]?ef)\b\s*\)?[\.\;]?)",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _unwrap_and_split_statements(cls, text: str) -> List[str]:
+        """
+        Unwraps soft line breaks within sentences, clinical lists, and method qualifiers,
+        while preserving boundaries between distinct list items, paragraphs, and table fields.
+        """
+        raw_lines = [line.strip() for line in re.split(r"[\r\n]+", text) if line.strip()]
+        if not raw_lines:
+            return []
+
+        merged_lines: List[str] = []
+        for line in raw_lines:
+            if not merged_lines:
+                merged_lines.append(line)
+                continue
+
+            prev = merged_lines[-1]
+            prev_ends_punct = bool(re.search(r"[.!?]\s*$", prev))
+            is_prev_colon = prev.endswith(":") or prev.endswith("=")
+            is_prev_connector = bool(
+                re.search(
+                    r"(?i)\b(?:is|was|are|with|of|between|from|to|at|and|or|estimated|approx\.?|approximately)\s*$",
+                    prev,
+                )
+            )
+            is_prev_lvef = bool(
+                re.search(
+                    r"(?i)\b(?:lvef|ef|ejection\s+fraction|lv\s+systolic\s+function|visually\s+estimated)\b",
+                    prev,
+                )
+            )
+
+            is_next_list_item = bool(cls.LIST_ITEM_PATTERN.match(line))
+            is_next_field_label = bool(cls.FIELD_LABEL_PATTERN.match(line))
+            is_next_method_modifier = bool(cls.METHOD_MODIFIER_PATTERN.match(line))
+            is_next_paren = line.startswith("(") or line.startswith("[")
+            is_next_numeric = bool(re.match(r"^[><~]?\s*[0-9]{2}\b", line))
+            is_next_lowercase = line[0].islower() if line else False
+            is_next_connector = bool(
+                re.match(r"(?i)^(?:to|and|with|of|between|from|or|percent|%)\b", line)
+            )
+
+            # Determine whether 'line' is a wrapped continuation that should merge onto 'prev'
+            should_merge = False
+
+            if is_next_method_modifier or is_next_paren:
+                # E.g. prev="LVEF 40%", line="(visual estimate)." or line="Visual estimate."
+                should_merge = True
+            elif is_prev_colon and not is_next_list_item:
+                # E.g. prev="Visually estimated LVEF:", line="45-50%"
+                should_merge = True
+            elif is_prev_connector or is_next_connector or is_next_lowercase:
+                # Syntactic continuation across line wrap
+                should_merge = True
+            elif is_prev_lvef and is_next_numeric and not is_next_list_item:
+                # E.g. prev="Visually estimated LVEF", line="45-50%"
+                should_merge = True
+            elif not prev_ends_punct and not is_next_list_item and not is_next_field_label:
+                # Soft line-wrapping without terminal punctuation
+                should_merge = True
+
+            if should_merge:
+                merged_lines[-1] = f"{prev} {line}"
+            else:
+                merged_lines.append(line)
+
+        # Split any merged lines that contain multiple sentences into individual statements
+        statements: List[str] = []
+        for m_line in merged_lines:
+            sub_stmts = [
+                s.strip()
+                for s in re.split(r"(?<=[.!?])\s+(?=[A-Z0-9\-•*])", m_line)
+                if s.strip()
+            ]
+            statements.extend(sub_stmts)
+
+        return statements
+
     def extract(self, parsed_doc: ParsedDocument) -> EchoLVEFResult:
         """
         Extracts LVEF according to strict section priority:
@@ -139,12 +225,8 @@ class EchoLVEFExtractor:
     ) -> List[EchoLVEFCandidate]:
         candidates: List[EchoLVEFCandidate] = []
 
-        # Split text into sentences / table lines
-        lines_or_sentences = [
-            s.strip()
-            for s in re.split(r"(?:\n+|\r+|(?<=[.!?])\s+(?=[A-Z0-9\-•*]))", text)
-            if s.strip()
-        ]
+        # Split text into statements, unwrapping soft line breaks
+        lines_or_sentences = self._unwrap_and_split_statements(text)
 
         for stmt in lines_or_sentences:
             stmt_lower = stmt.lower()
