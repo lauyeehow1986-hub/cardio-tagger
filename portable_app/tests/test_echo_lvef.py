@@ -185,28 +185,54 @@ def test_visually_estimated_variations():
         assert res.lvef_section == "CONCLUSION"
 
 
-def test_method_priority_3d_over_2d_over_visual():
+def test_method_priority_3d_over_2d_over_visual_over_unspecified():
     parser = ClinicalSectionParser()
     extractor = EchoLVEFExtractor()
 
-    # In Conclusion: 3D, 2D, and Visual -> 3D wins
-    t1 = "CONCLUSION:\n1. 3D LVEF: 55%.\n2. 2D Biplane Simpson's: 50%.\n3. Visually estimated LVEF: 45 to 50%."
+    # Hierarchy: 3D (Rank 1) > 2D (Rank 2) > VISUAL (Rank 3) > UNSPECIFIED (Rank 4)
+
+    # 1. 3D, 2D, Visual, Unspecified present -> 3D wins
+    t1 = (
+        "CONCLUSION:\n"
+        "1. 3D LVEF: 55%.\n"
+        "2. 2D Biplane Simpson's: 50%.\n"
+        "3. Visually estimated LVEF: 45 to 50%.\n"
+        "4. LVEF is 52%."
+    )
     d1 = parser.parse_pages("t1.txt", [t1])
     r1 = extractor.extract(d1)
     assert r1.lvef_extracted == "55%"
     assert r1.lvef_method == "3D"
 
-    # In Conclusion: 2D and Visual -> 2D wins
-    t2 = "CONCLUSION:\n1. 2D Biplane Simpson's LVEF: 50%.\n2. Visually estimated LVEF 45 to 50%."
+    # 2. 2D, Visual, Unspecified present -> 2D wins
+    t2 = (
+        "CONCLUSION:\n"
+        "1. 2D Biplane Simpson's LVEF: 50%.\n"
+        "2. Visually estimated LVEF 45 to 50%.\n"
+        "3. LVEF 52%."
+    )
     d2 = parser.parse_pages("t2.txt", [t2])
     r2 = extractor.extract(d2)
     assert r2.lvef_extracted == "50%"
     assert r2.lvef_method == "2D_BIPLANE"
 
-    # In Conclusion: only Visual -> Visual wins
-    t3 = "CONCLUSION:\nVisually estimated LVEF 45 to 50%."
+    # 3. Visual and Unspecified present -> Visual wins over Unspecified
+    t3 = (
+        "CONCLUSION:\n"
+        "1. Visually estimated LVEF 45 to 50%.\n"
+        "2. Calculated LVEF 52%."
+    )
     d3 = parser.parse_pages("t3.txt", [t3])
     r3 = extractor.extract(d3)
     assert r3.lvef_extracted == "45-50%"
+    assert r3.lvef_numeric == 47.5
     assert r3.lvef_method == "VISUAL"
+
+    # 4. Only Unspecified numeric present -> Unspecified wins
+    t4 = "CONCLUSION:\nLVEF is 52%."
+    d4 = parser.parse_pages("t4.txt", [t4])
+    r4 = extractor.extract(d4)
+    assert r4.lvef_extracted == "52%"
+    assert r4.lvef_numeric == 52.0
+    assert r4.lvef_method == "UNSPECIFIED"
 

@@ -5,7 +5,7 @@ Features:
   1. Strict Section Cascade:
      Conclusion / Impression / Summary (P1) -> Findings / Left Ventricle (P2) -> Measurements (P3)
   2. Method Preference (within active section):
-     3D > 2D (Biplane Simpson / Auto-EF / Teichholz) > Unspecified > Visual (Eyeball / Estimated)
+     3D > 2D (Biplane Simpson / Auto-EF / Teichholz) > Visual (Eyeball / Estimated) > Unspecified
   3. Historical & Comparative Disambiguation:
      Excludes dated historical studies (e.g. "prior LVEF 40% in 2021").
      Resolves comparative sentences ("improved from 30% on prior to 55% currently" -> 55%).
@@ -25,7 +25,7 @@ class EchoLVEFCandidate:
     raw_text: str
     numeric_midpoint: Optional[float]
     method: str  # 3D, 2D_BIPLANE, 2D_TEICHHOLZ, 2D, VISUAL, UNSPECIFIED, QUALITATIVE
-    method_rank: int  # 1: 3D, 2: 2D, 3: UNSPECIFIED, 4: VISUAL, 5: QUALITATIVE
+    method_rank: int  # 1: 3D, 2: 2D, 3: VISUAL, 4: UNSPECIFIED, 5: QUALITATIVE
     section_name: str
     is_historical: bool
     evidence_clause: str
@@ -122,7 +122,7 @@ class EchoLVEFExtractor:
         if not current_candidates:
             return None
 
-        # Sort by method hierarchy (3D=1, 2D=2, UNSPECIFIED=3, VISUAL=4)
+        # Sort by method hierarchy (3D=1, 2D=2, VISUAL=3, UNSPECIFIED=4)
         current_candidates.sort(key=lambda c: (c.method_rank, -(c.numeric_midpoint or 0)))
         best = current_candidates[0]
 
@@ -166,7 +166,7 @@ class EchoLVEFExtractor:
                         raw_text=parsed_prior,
                         numeric_midpoint=mid_prior,
                         method="UNSPECIFIED",
-                        method_rank=3,
+                        method_rank=4,
                         section_name=section_name,
                         is_historical=True,
                         evidence_clause=stmt,
@@ -263,8 +263,8 @@ class EchoLVEFExtractor:
         Determines the acquisition method and assigns strict priority rank:
         1: 3D
         2: 2D (Biplane, Simpson, Teichholz, Auto-EF, 2D Quantitative)
-        3: UNSPECIFIED (Numeric without visual marker)
-        4: VISUAL (Eyeball, Estimated, Range without 2D/3D tag)
+        3: VISUAL (Eyeball, Estimated, Range without 2D/3D tag)
+        4: UNSPECIFIED (Numeric without visual marker)
         """
         nearby = f"{before_match} {after_match}"
 
@@ -272,11 +272,11 @@ class EchoLVEFExtractor:
         if re.search(r"(?i)\b(?:3[\-\s]?d|tri[\-\s]?plane|3[\-\s]?d\s+(?:auto|simpson|volume|full))\b", nearby):
             return "3D", 1
 
-        # 2. Explicit Visual / Eyeball / Estimated (Rank 4)
+        # 2. Explicit Visual / Eyeball / Estimated (Rank 3)
         # If explicitly marked as visual/estimated (e.g. "visually estimated lvef 45 to 50%"),
         # visual classification takes precedence even if the broader sentence mentioned 2D Echo.
         if re.search(r"(?i)\b(?:visual(?:ly)?|eyeball|estimated?|semi[\-\s]?quantitative)\b", nearby):
-            return "VISUAL", 4
+            return "VISUAL", 3
 
         # 3. Explicit 2D Biplane / Simpson / Auto-EF (Rank 2)
         if re.search(r"(?i)\b(?:biplane|simpson(?:'s)?|modified\s+simpson|method\s+of\s+discs|auto[\-\s]?ef)\b", nearby):
@@ -290,12 +290,12 @@ class EchoLVEFExtractor:
         if re.search(r"(?i)\b(?:2[\-\s]?d(?:\s+lvef|\s+ef)?|quantitative)\b", before_match):
             return "2D", 2
 
-        # 6. Any range without 2D/3D tag is clinically an estimated visual range (Rank 4)
+        # 6. Any range without 2D/3D tag is clinically an estimated visual range (Rank 3)
         if has_high or re.search(r"[0-9]{2}\s*(?:[\-–—]|(?:\s*(?:to|and)\s*))\s*[0-9]{2}", val_match_str):
-            return "VISUAL", 4
+            return "VISUAL", 3
 
-        # 7. Unspecified numeric value (Rank 3)
-        return "UNSPECIFIED", 3
+        # 7. Unspecified numeric value (Rank 4)
+        return "UNSPECIFIED", 4
 
     def _is_historical(
         self, full_stmt: str, local_window: str, before_match: str = "", after_match: str = ""
