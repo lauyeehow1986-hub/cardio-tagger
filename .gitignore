@@ -1,0 +1,57 @@
+# Virtual environments & Python cache
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+
+# Workspace mirror
+.agents/
+
+# Temporary runtime & model caches
+.cache/
+.pytest_cache/
+*.duckdb
+*.duckdb.wal
+checkpoint.duckdb
+
+# Output artifacts
+results.csv
+results.jsonl
+results.parquet
+sample_results.csv
+sample_results.jsonl
+sample_results.parquet
+staged_pci_results.csv
+staged_pci_detailed.jsonl
+staged_pci_results.parquet
+test_*.csv
+
+# Large distribution binaries (released via GitHub Releases)
+dist/
+*.zip
+*.tar.gz
+*.whl
+python-3.11.9-embed-amd64.zip
+get-pip.py
+
+# Sensitive credentials & environment files
+.env
+.env.*
+*.pem
+*.key
+*.jks
+credentials.json
+token.json
+*.secret
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+test.txt

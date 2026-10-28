@@ -1,0 +1,277 @@
+version: "1.0.0"
+default_section_targets:
+  - "conclusion"
+  - "impression"
+  - "summary"
+  - "recommendations"
+  - "plan"
+
+section_headers:
+  conclusion:
+    canonical_name: "CONCLUSION"
+    priority: 1
+    patterns:
+      - '(?im)^\s*(?:[0-9]+[\.\)]\s*)?(?:FINAL\s+|CATHETERIZATION\s+|ANGIOGRAPHIC\s+|CLINICAL\s+|DISCHARGE\s+)?(?:CONCLUSIONS?|IMPRESSIONS?|SUMMARY\s+AND\s+PLAN|IMPRESSION\s*/\s*PLAN|CONCLUSION\s*AND\s*RECOMMENDATIONS?|SUMMARY|ASSESSMENT\s*(?:&|AND)\s*PLAN)\s*(?:[:\-—\n]|$)'
+      - '(?im)^\s*(?:\[|\*\*)?(?:CONCLUSIONS?|IMPRESSIONS?|RECOMMENDATIONS?)(?:\]|\*\*)?\s*[:\-—]'
+  stop_headers:
+    patterns:
+      - '(?im)^\s*(?:[0-9]+[\.\)]\s*)?(?:ELECTRONICALLY\s+SIGNED\s+BY|SIGNED\s+BY|ATTENDING\s+PHYSICIAN|DICTATED\s+BY|CC:|DISTRIBUTION:|ADDENDUM|BILLING\s+CODES|CPT\s+CODES|HEMODYNAMICS\s+TABLE|RADIATION\s+DOSE|CONTRAST\s+VOLUME|MEDICATIONS\s+ADMINISTERED|NURSING\s+NOTES)\b'
+
+assertion_modifiers:
+  negated:
+    pre_window_tokens: 8
+    post_window_tokens: 4
+    patterns:
+      - '\b(?:no\s+indication\s+for|no\s+plan\s+for|not\s+a\s+candidate\s+for|without\s+need\s+for|ruled\s+out|declined|refused|defer\s+indefinitely|no\s+further\s+pci|no\s+staged\s+pci|not\s+planned|avoid)\b'
+  historical:
+    pre_window_tokens: 6
+    post_window_tokens: 4
+    patterns:
+      - '\b(?:history\s+of|prior|previous|s/p\s+prior|remote\s+history\s+of|in\s+20[0-2][0-9]|months\s+ago|years\s+ago)\b'
+  conditional_or_hypothetical:
+    pre_window_tokens: 8
+    post_window_tokens: 6
+    patterns:
+      - '\b(?:if\s+ischemia|if\s+symptomatic|if\s+ffr\s+positive|consider\s+staged|possible\s+staged|pending\s+stress\s+test|pending\s+viability|should\s+symptoms\s+recur|versus\s+cabg)\b'
+  performed_index:
+    pre_window_tokens: 6
+    post_window_tokens: 6
+    patterns:
+      - '\b(?:successful\s+staged\s+pci\s+performed\s+today|underwent\s+staged\s+pci\s+today|completion\s+of\s+staged\s+pci|staged\s+pci\s+to\s+[a-z0-9\s]+\s+completed)\b'
+  planned_future:
+    pre_window_tokens: 8
+    post_window_tokens: 10
+    patterns:
+      - '\b(?:plan\s+for\s+staged|recommend\s+staged|scheduled\s+for\s+staged|return\s+for\s+staged|staged\s+pci\s+in\s+[0-9]+|staged\s+intervention\s+to|staged\s+revascularization\s+of|bring\s+back\s+for\s+pci|elective\s+staged\s+pci|stage\s+ii\s+pci|staged\s+pci\s+during\s+index\s+admission|staged\s+pci\s+at\s+a\s+later\s+date)\b'
+
+concepts:
+  staged_pci:
+    id: "CARDIO_STAGED_PCI"
+    display_name: "Staged Percutaneous Coronary Intervention (Staged PCI)"
+    snomed_ct: "415070008"
+    umls_cui: "C1532338"
+    target_sections: ["conclusion", "impression", "plan", "recommendations", "summary"]
+    allow_all_sections_fallback: true
+    aho_corasick_seeds:
+      - "staged pci"
+      - "stage pci"
+      - "staged percutaneous"
+      - "staged intervention"
+      - "staged revascularization"
+      - "staged angioplasty"
+      - "staged stenting"
+      - "stage 2 pci"
+      - "stage ii pci"
+      - "second stage pci"
+      - "two-stage pci"
+      - "non-culprit pci"
+      - "nonculprit pci"
+      - "bring back for pci"
+      - "return for pci"
+      - "deferred pci to"
+      - "relook angio"
+      - "staged lad"
+      - "staged rca"
+      - "staged lcx"
+      - "staged om"
+      - "staged diag"
+    regex_patterns:
+      - '(?i)\b(?:staged?|two[\s\-]stage|second[\s\-]stage|stage\s+(?:2|ii))\s+(?:pci|percutaneous\s+coronary\s+intervention|coronary\s+intervention|revascularization|angioplasty|stenting|des)\b'
+      - '(?i)\b(?:pci|revascularization|intervention|stenting)\s+(?:of|to)\s+(?:the\s+)?(?:non[\-\s]?culprit\s+)?(?:lad|rca|lcx|left\s+main|lmca|om[1-3]?|d[1-2]?|diagonal|ramus|pda|plv|[a-z]+\s+artery)\s+(?:as\s+a\s+staged\s+procedure|in\s+a\s+staged\s+fashion|at\s+a\s+later\s+stage|in\s+[1-8]\s+(?:days|weeks))\b'
+      - '(?i)\b(?:bring\s+back|return|schedule\s+patient)\s+(?:in\s+[0-9]+\s+(?:days|weeks|months)\s+)?for\s+(?:staged\s+|elective\s+|completion\s+)?(?:pci|revascularization|intervention)\s+(?:of|to)\b'
+    gliner_labels:
+      - "staged percutaneous coronary intervention"
+      - "planned future coronary stenting"
+      - "non-culprit target vessel for staged PCI"
+      - "timeframe for staged revascularization"
+    subtypes:
+      - "STAGED_PCI_PLANNED"
+      - "STAGED_PCI_PERFORMED_INDEX"
+      - "STAGED_PCI_CONDITIONAL"
+      - "STAGED_PCI_HISTORICAL"
+      - "STAGED_PCI_NEGATED"
+
+  primary_or_culprit_pci:
+    id: "CARDIO_CULPRIT_PCI"
+    display_name: "Primary / Culprit Lesion PCI"
+    snomed_ct: "415070008"
+    target_sections: ["conclusion", "all"]
+    aho_corasick_seeds:
+      - "primary pci"
+      - "culprit pci"
+      - "pci to culprit"
+      - "successful pci"
+      - "des to lad"
+      - "des to rca"
+      - "des to lcx"
+      - "drug eluting stent"
+    regex_patterns:
+      - '(?i)\b(?:primary|emergent|culprit(?:\s+lesion)?|successful|ad\s+hoc)\s+pci\b'
+    gliner_labels:
+      - "primary percutaneous coronary intervention"
+      - "culprit coronary artery lesion"
+      - "drug eluting stent implantation"
+
+  cabg_evaluation:
+    id: "CARDIO_CABG"
+    display_name: "Coronary Artery Bypass Grafting (CABG) Referral or History"
+    snomed_ct: "232717009"
+    target_sections: ["conclusion", "all"]
+    aho_corasick_seeds:
+      - "cabg"
+      - "coronary artery bypass"
+      - "cardiothoracic surgery"
+      - "surgical revascularization"
+      - "heart team discussion"
+    regex_patterns:
+      - '(?i)\b(?:cabg|coronary\s+artery\s+bypass(?:\s+grafting)?|surgical\s+revascularization|cardiothoracic\s+surgical\s+consult)\b'
+    gliner_labels:
+      - "coronary artery bypass grafting"
+      - "surgical revascularization recommendation"
+
+  lvef_systolic_function:
+    id: "CARDIO_LVEF"
+    display_name: "Left Ventricular Ejection Fraction (LVEF)"
+    snomed_ct: "250908004"
+    target_sections: ["all"]
+    aho_corasick_seeds:
+      - "lvef"
+      - "ejection fraction"
+      - "lv systolic function"
+      - "ef "
+      - "ef:"
+    regex_patterns:
+      - '(?i)\b(?:lvef|lv\s+ejection\s+fraction|ejection\s+fraction|ef)\s*(?:of|is|estimated\s+at|approx(?:imately)?|[:=])?\s*([0-9]{2}(?:\s*[\-–]\s*[0-9]{2})?\s*%)'
+    gliner_labels:
+      - "left ventricular ejection fraction percentage"
+      - "ventricular systolic dysfunction"
+
+  coronary_vessel_stenosis:
+    id: "CARDIO_VESSEL_STENOSIS"
+    display_name: "Coronary Artery Stenosis & CAD Severity (1VD/2VD/3VD/LM)"
+    snomed_ct: "53741008"
+    target_sections: ["conclusion", "findings", "all"]
+    aho_corasick_seeds:
+      - "single vessel"
+      - "double vessel"
+      - "triple vessel"
+      - "three vessel"
+      - "multivessel"
+      - "left main disease"
+      - "1vd"
+      - "2vd"
+      - "3vd"
+      - "tvd"
+      - "dvd"
+      - "svd"
+      - "cto"
+      - "chronic total occlusion"
+      - "in-stent restenosis"
+      - "isr"
+    regex_patterns:
+      - '(?i)\b(?:single|one|double|two|triple|three|multi)[\s\-]?vessel\s+(?:coronary\s+artery\s+disease|cad|disease)\b'
+      - '(?i)\b(?:1vd|2vd|3vd|svd|dvd|tvd|chronic\s+total\s+occlusion|cto|in[\s\-]stent\s+restenosis)\b'
+    gliner_labels:
+      - "coronary artery stenosis percentage"
+      - "coronary vessel name"
+      - "chronic total occlusion"
+
+  intracoronary_physiology_imaging:
+    id: "CARDIO_IVUS_OCT_FFR"
+    display_name: "Intracoronary Imaging (IVUS/OCT) & Physiology (FFR/iFR/RFR)"
+    snomed_ct: "443236006"
+    target_sections: ["conclusion", "procedure", "all"]
+    aho_corasick_seeds:
+      - "ivus"
+      - "intravascular ultrasound"
+      - "oct"
+      - "optical coherence tomography"
+      - "ffr"
+      - "fractional flow reserve"
+      - "ifr"
+      - "nhpr"
+    regex_patterns:
+      - '(?i)\b(?:ivus|intravascular\s+ultrasound|oct|optical\s+coherence\s+tomography|ffr|fractional\s+flow\s+reserve|ifr)\b'
+    gliner_labels:
+      - "intravascular ultrasound or optical coherence tomography"
+      - "fractional flow reserve measurement"
+
+  calcium_modification_athrectomy:
+    id: "CARDIO_CALCIUM_MOD"
+    display_name: "Calcium Modification (Intravascular Lithotripsy / Rotational / Orbital Atherectomy)"
+    snomed_ct: "711565008"
+    target_sections: ["conclusion", "procedure", "all"]
+    aho_corasick_seeds:
+      - "shockwave"
+      - "intravascular lithotripsy"
+      - "ivl"
+      - "rotablator"
+      - "rotational atherectomy"
+      - "orbital atherectomy"
+      - "cutting balloon"
+    regex_patterns:
+      - '(?i)\b(?:intravascular\s+lithotripsy|shockwave|ivl|rotational\s+atherectomy|rotablator|orbital\s+atherectomy)\b'
+    gliner_labels:
+      - "coronary atherectomy or intravascular lithotripsy"
+
+  structural_valvular_intervention:
+    id: "CARDIO_STRUCTURAL_VALVE"
+    display_name: "Structural & Valvular Heart Disease (TAVR/TAVI, MitraClip, AS/MR)"
+    snomed_ct: "708983005"
+    target_sections: ["conclusion", "all"]
+    aho_corasick_seeds:
+      - "tavr"
+      - "tavi"
+      - "transcatheter aortic"
+      - "aortic stenosis"
+      - "mitral regurgitation"
+      - "mitraclip"
+      - "teer"
+      - "watchman"
+      - "laao"
+    regex_patterns:
+      - '(?i)\b(?:tavr|tavi|transcatheter\s+aortic\s+valve|severe\s+aortic\s+stenosis|mitraclip|teer|left\s+atrial\s+appendage\s+occlusion)\b'
+    gliner_labels:
+      - "valvular heart disease severity"
+      - "transcatheter structural heart intervention"
+
+  mechanical_circulatory_support:
+    id: "CARDIO_MCS"
+    display_name: "Mechanical Circulatory Support (Impella, IABP, VA-ECMO)"
+    snomed_ct: "232967006"
+    target_sections: ["conclusion", "procedure", "all"]
+    aho_corasick_seeds:
+      - "impella"
+      - "iabp"
+      - "intra-aortic balloon"
+      - "ecmo"
+      - "va-ecmo"
+      - "cardiogenic shock"
+    regex_patterns:
+      - '(?i)\b(?:impella|iabp|intra[\s\-]aortic\s+balloon\s+pump|va[\s\-]?ecmo|cardiogenic\s+shock)\b'
+    gliner_labels:
+      - "mechanical circulatory support device"
+      - "cardiogenic shock"
+
+  dapt_antithrombotic_regimen:
+    id: "CARDIO_DAPT"
+    display_name: "Dual Antiplatelet Therapy (DAPT) & Anticoagulation Plan"
+    snomed_ct: "416892008"
+    target_sections: ["conclusion", "plan", "recommendations", "all"]
+    aho_corasick_seeds:
+      - "dapt"
+      - "dual antiplatelet"
+      - "aspirin"
+      - "clopidogrel"
+      - "plavix"
+      - "ticagrelor"
+      - "brilinta"
+      - "prasugrel"
+      - "effient"
+      - "apixaban"
+      - "rivaroxaban"
+    regex_patterns:
+      - '(?i)\b(?:dapt|dual\s+antiplatelet\s+therapy|ticagrelor|prasugrel|clopidogrel)\b'
+    gliner_labels:
+      - "antiplatelet or anticoagulant medication regimen"
+      - "duration of dual antiplatelet therapy"

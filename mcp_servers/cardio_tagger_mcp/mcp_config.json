@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "cardio-tagger-mcp": {
+      "command": "C:/Python314/python.exe",
+      "args": [
+        "mcp_servers/cardio_tagger_mcp/server.py"
+      ],
+      "env": {
+        "PYTHONUTF8": "1",
+        "TORCHINDUCTOR_CACHE_DIR": "C:/Users/lauye/Downloads/cardio_pdf_tagging/.cache/torch_inductor",
+        "HF_HOME": "C:/Users/lauye/Downloads/cardio_pdf_tagging/.cache/huggingface",
+        "TORCH_HOME": "C:/Users/lauye/Downloads/cardio_pdf_tagging/.cache/torch"
+      }
+    }
+  }
+}
