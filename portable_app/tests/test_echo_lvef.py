@@ -434,4 +434,43 @@ def test_edge_case_unspaced_ef_and_wall_motion():
     assert r3.lvef_method == "UNSPECIFIED"
 
 
+def test_edge_case_lvef_57_percent_simpson_biplane():
+    parser = ClinicalSectionParser()
+    extractor = EchoLVEFExtractor()
+
+    # User edge case:
+    # "LVEF 57 %(LVEF Simpson biplane)"
+    # Test 1: In Conclusion
+    t1 = "CONCLUSION:\nLVEF 57 %(LVEF Simpson biplane)"
+    d1 = parser.parse_pages("t1.txt", [t1])
+    r1 = extractor.extract(d1)
+    assert r1.lvef_extracted == "57%"
+    assert r1.lvef_numeric == 57.0
+    assert r1.lvef_method == "2D_BIPLANE"
+
+    # Test 2: In LV MEASUREMENTS table
+    t2 = (
+        "INDICATION: Shortness of breath.\n\n"
+        "LV MEASUREMENTS:\n"
+        "LVEDD: 4.8 cm\n"
+        "LVEF 57 %(LVEF Simpson biplane)\n\n"
+        "CONCLUSION:\n"
+        "Normal examination."
+    )
+    d2 = parser.parse_pages("t2.txt", [t2])
+    r2 = extractor.extract(d2)
+    assert r2.lvef_extracted == "57%", f"Expected 57%, got {r2.lvef_extracted}"
+    assert r2.lvef_numeric == 57.0
+    assert r2.lvef_method == "2D_BIPLANE"
+
+    # Test 3: Decimal output from ultrasound machine (57.0 %)
+    t3 = "CONCLUSION:\nLVEF 57.0 %(LVEF Simpson biplane)"
+    d3 = parser.parse_pages("t3.txt", [t3])
+    r3 = extractor.extract(d3)
+    assert r3.lvef_extracted in ("57%", "57.0%"), f"Expected 57%, got {r3.lvef_extracted}"
+    assert r3.lvef_numeric == 57.0
+    assert r3.lvef_method == "2D_BIPLANE"
+
+
+
 

@@ -77,17 +77,16 @@ class ClinicalSectionParser:
         "findings": re.compile(
             r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:"
             r"CORONARY[\t ]+ANGIOGRAPHY|ANGIOGRAPHIC[\t ]+FINDINGS?|FINDINGS?|CORONARY[\t ]+ANATOMY|"
-            r"LEFT[\t ]+VENTRICLE|LV[\t ]+SYSTOLIC[\t ]+FUNCTION|VENTRICULAR[\t ]+FUNCTION|"
-            r"WALL[\t ]+MOTION[\t ]+FINDINGS?|CHAMBERS?|ECHOCARDIOGRAPHIC[\t ]+FINDINGS?|2D[\t ]+FINDINGS?"
+            r"LEFT[\t ]+VENTRICLE|LV[\t ]+SYSTOLIC[\t ]+FUNCTION|VENTRICULAR[\t ]+FUNCTION|LV[\t ]+FUNCTION|"
+            r"LEFT[\t ]+VENTRICULAR[\t ]+FUNCTION|WALL[\t ]+MOTION[\t ]+FINDINGS?|WALL[\t ]+MOTION|"
+            r"CHAMBERS?|ECHOCARDIOGRAPHIC[\t ]+FINDINGS?|2D[\t ]+FINDINGS?"
             r")[\t ]*(?:[:\-—\n]|$)"
         ),
         "measurements": re.compile(
-            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:"
-            r"QUANTITATIVE[\t ]+MEASUREMENTS?|ECHO(?:CARDIOGRAPHIC)?[\t ]+MEASUREMENTS?|"
-            r"MEASUREMENTS?|2D[\t ]+MEASUREMENTS?|M[\-\s]MODE[\t ]+(?:&|AND[\t ]+)?2D[\t ]+MEASUREMENTS?|"
-            r"HEMODYNAMICS?[\t ]+(?:&|AND[\t ]+)?MEASUREMENTS?|MEASUREMENTS?[\t ]+(?:&|AND[\t ]+)?CALCULATIONS?|"
-            r"DOPPLER[\t ]+MEASUREMENTS?|DIMENSIONS?|QUANTITATIVE[\t ]+DATA"
-            r")[\t ]*(?:[:\-—\n]|$)"
+            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?"
+            r"(?:(?:LV|LEFT[\t ]+VENTRICULAR|RV|RIGHT[\t ]+VENTRICULAR|CARDIAC|CHAMBER|ECHO|2D|DOPPLER|M[\-\s]MODE|QUANTITATIVE|HEMODYNAMIC)[\t /&AND\-]*)*"
+            r"(?:MEASUREMENTS?|CALCULATIONS?|DATA|PARAMETERS?|DIMENSIONS?|QUANTITATION|QUANTIFICATION)"
+            r"[\t ]*(?:[:\-—\n]|$)"
         ),
         "complications": re.compile(
             r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:COMPLICATIONS?|ESTIMATED[\t ]+BLOOD[\t ]+LOSS)[\t ]*(?:[:\-—\n]|$)"

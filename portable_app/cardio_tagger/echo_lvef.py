@@ -46,12 +46,12 @@ class EchoLVEFExtractor:
     echocardiography reports, enforcing clinical section priority and method hierarchy.
     """
 
-    # Primary numerical LVEF pattern: captures 55%, 50-55%, 50 to 55%, 50% to 55%, 50-55, 50 to 50, >55%, <35%
-    # Uses negative lookaround to prevent matching decimals (e.g. 0.94 cm2/m2) as integer percentages
+    # Primary numerical LVEF pattern: captures 55%, 57.0%, 50-55%, 50 to 55%, 50% to 55%, 50-55, 50 to 50, >55%, <35%
+    # Uses (?<![\.\d]) to require at least 2 integer digits, preventing fractional numbers (e.g. 0.94 cm2/m2) from matching
     LVEF_NUMERIC_PATTERN = re.compile(
         r"(?i)(?:between\s+)?(?P<prefix>>|<|>=|<=|~|approx\.?|approximately|greater\s+than|less\s+than)?\s*"
-        r"(?<![\.\d])(?P<low>[0-9]{2})(?!\.[0-9])\s*(?:%|percent)?\s*"
-        r"(?:(?:[\-–—]|(?:\s*(?:to|and)\s*))\s*(?<![\.\d])(?P<high>[0-9]{2})(?!\.[0-9])\s*(?:%|percent)?)?"
+        r"(?<![\.\d])(?P<low>[0-9]{2}(?:\.[0-9]{1,2})?)(?!\.[0-9])\s*(?:%|percent)?\s*"
+        r"(?:(?:[\-–—]|(?:\s*(?:to|and)\s*))\s*(?<![\.\d])(?P<high>[0-9]{2}(?:\.[0-9]{1,2})?)(?!\.[0-9])\s*(?:%|percent)?)?"
         r"(?:\s*%)?"
     )
 
@@ -202,6 +202,18 @@ class EchoLVEFExtractor:
         if res and res.lvef_extracted != "NONE":
             return res
 
+        # Section Priority 4: Fallback to any other report section (e.g. unclassified tables, procedures)
+        other_sections = [
+            s
+            for sec_type, sec_list in parsed_doc.all_sections.items()
+            if sec_type not in ("conclusion", "plan", "findings", "measurements")
+            for s in sec_list
+        ]
+        if other_sections:
+            res = self._extract_from_section_group("OTHER", other_sections)
+            if res and res.lvef_extracted != "NONE":
+                return res
+
         # If no numeric candidate found in any section, check for qualitative descriptors
         qual_res = self._extract_qualitative_fallback(parsed_doc)
         if qual_res:
@@ -315,10 +327,13 @@ class EchoLVEFExtractor:
                     if not (5 <= high_val <= 95):
                         continue
                     midpoint = round((low_val + high_val) / 2.0, 1)
-                    raw_formatted = f"{int(low_val)}-{int(high_val)}%"
+                    low_disp = f"{int(low_val)}" if low_val == int(low_val) else f"{low_val}"
+                    high_disp = f"{int(high_val)}" if high_val == int(high_val) else f"{high_val}"
+                    raw_formatted = f"{low_disp}-{high_disp}%"
                 else:
                     midpoint = low_val
-                    raw_formatted = f"{prefix or ''}{int(low_val)}%"
+                    low_disp = f"{int(low_val)}" if low_val == int(low_val) else f"{low_val}"
+                    raw_formatted = f"{prefix or ''}{low_disp}%"
 
                 # Context around this specific match
                 start_idx = max(0, m.start() - 50)
@@ -435,11 +450,13 @@ class EchoLVEFExtractor:
         if not m:
             return raw_str.strip(), None
         low = float(m.group("low"))
+        low_disp = f"{int(low)}" if low == int(low) else f"{low}"
         if m.group("high"):
             high = float(m.group("high"))
-            return f"{int(low)}-{int(high)}%", round((low + high) / 2.0, 1)
+            high_disp = f"{int(high)}" if high == int(high) else f"{high}"
+            return f"{low_disp}-{high_disp}%", round((low + high) / 2.0, 1)
         prefix = m.group("prefix") or ""
-        return f"{prefix}{int(low)}%", low
+        return f"{prefix}{low_disp}%", low
 
     def _extract_qualitative_fallback(self, parsed_doc: ParsedDocument) -> Optional[EchoLVEFResult]:
         for sec in parsed_doc.conclusion_sections:
