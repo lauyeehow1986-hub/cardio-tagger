@@ -272,6 +272,31 @@ def test_echo_lvef_sieve_integration():
     assert res.lvef_section == "CONCLUSION"
 
 
+def test_demographics_sieve_integration():
+    sieve = get_sieve()
+    text = (
+        "NATIONAL UNIVERSITY HEART CENTRE SINGAPORE\n"
+        "CORONARY ANGIOGRAM & PCI REPORT\n\n"
+        "Patient Name: WONG KOK LEONG          NRIC: T0123456A\n"
+        "Patient ID: MRN44921                  DOB: 15/08/1975\n"
+        "Date of Procedure: 12-Nov-2026        Report Date: 13-Nov-2026\n\n"
+        "INDICATION: STEMI.\n"
+        "CONCLUSION:\n"
+        "1. Successful primary PCI to culprit LAD.\n"
+        "2. Recommend staged PCI to RCA in 3 weeks.\n"
+    )
+    res = sieve.evaluate_document("cath_report.pdf", [text])
+    assert res.patient_name == "WONG KOK LEONG"
+    assert res.nric == "T0123456A"
+    assert res.patient_id == "MRN44921"
+    assert res.procedure_date == "2026-11-12"
+    assert res.report_date == "2026-11-13"
+    assert res.procedure_type == "CATH_PCI"
+    assert res.staged_pci_detected is True
+    assert res.staged_pci_status == "AFFIRMED_PLANNED"
+
+
+
 
 if __name__ == "__main__":
     test_case1_final_page_newline()

@@ -45,7 +45,7 @@ def test_standard_singapore_nric_and_demographics():
     assert "TRANSTHORACIC ECHOCARDIOGRAM" in res.procedure_title.upper()
 
 
-def test_temporary_nric_x_and_y_up_to_12_chars():
+def test_temporary_nric_x_and_y_up_to_13_chars():
     extractor = PatientDemographicsExtractor()
     
     # 9-char X NRIC
@@ -55,10 +55,10 @@ def test_temporary_nric_x_and_y_up_to_12_chars():
     assert r1.procedure_type == "CATH_PCI"
     assert r1.procedure_date == "2026-03-15"
 
-    # 12-char Y temporary NRIC ending with alphabet
-    t2 = "Patient: JANE SMITH MDM\nIdentity No: Y1234567890A\nMRN: 994821\nStudy Date: 2026-05-20\nTRANSESOPHAGEAL ECHOCARDIOGRAM"
+    # 13-char X temporary NRIC ending with alphabet (e.g. x01234567891a)
+    t2 = "Patient: JANE SMITH MDM\nIdentity No: x01234567891a\nMRN: 994821\nStudy Date: 2026-05-20\nTRANSESOPHAGEAL ECHOCARDIOGRAM"
     r2 = extractor.extract(t2)
-    assert r2.nric == "Y1234567890A"
+    assert r2.nric == "X01234567891A"
     assert r2.procedure_type == "TEE"
     assert r2.procedure_date == "2026-05-20"
 

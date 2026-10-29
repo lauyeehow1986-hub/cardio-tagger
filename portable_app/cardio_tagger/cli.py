@@ -436,6 +436,13 @@ def main():
         print(f"[Cardio-Tagger] Processing {len(tasks)} CSV rows with {args.workers} workers (maxtasksperchild=500)...")
 
         tagger_fields = [
+            "patient_name",
+            "nric",
+            "patient_id",
+            "procedure_date",
+            "report_date",
+            "procedure_type",
+            "procedure_title",
             "staged_pci_detected",
             "staged_pci_status",
             "staged_pci_vessels",
@@ -480,6 +487,13 @@ def main():
                         concept_dict = _format_concept_fields(res_dict, selected_concepts)
 
                         row_out = dict(orig)
+                        row_out["patient_name"] = orig.get("patient_name") or res_dict.get("patient_name", "")
+                        row_out["nric"] = orig.get("nric") or res_dict.get("nric", "")
+                        row_out["patient_id"] = orig.get("patient_id") or res_dict.get("patient_id", "")
+                        row_out["procedure_date"] = orig.get("procedure_date") or res_dict.get("procedure_date", "")
+                        row_out["report_date"] = orig.get("report_date") or res_dict.get("report_date", "")
+                        row_out["procedure_type"] = orig.get("procedure_type") or res_dict.get("procedure_type", "OTHER")
+                        row_out["procedure_title"] = orig.get("procedure_title") or res_dict.get("procedure_title", "")
                         row_out["staged_pci_detected"] = res_dict["staged_pci_detected"]
                         row_out["staged_pci_status"] = res_dict["staged_pci_status"]
                         row_out["staged_pci_vessels"] = ";".join(res_dict["staged_pci_vessels"])
@@ -535,6 +549,13 @@ def main():
 
         base_fields = [
             "pdf_path",
+            "patient_name",
+            "nric",
+            "patient_id",
+            "procedure_date",
+            "report_date",
+            "procedure_type",
+            "procedure_title",
             "total_pages",
             "conclusion_found",
             "conclusion_in_early_section",
@@ -579,6 +600,13 @@ def main():
 
                         row_data = {
                             "pdf_path": res_dict["pdf_path"],
+                            "patient_name": res_dict.get("patient_name", ""),
+                            "nric": res_dict.get("nric", ""),
+                            "patient_id": res_dict.get("patient_id", ""),
+                            "procedure_date": res_dict.get("procedure_date", ""),
+                            "report_date": res_dict.get("report_date", ""),
+                            "procedure_type": res_dict.get("procedure_type", "OTHER"),
+                            "procedure_title": res_dict.get("procedure_title", ""),
                             "total_pages": res_dict["total_pages"],
                             "conclusion_found": res_dict["conclusion_found"],
                             "conclusion_in_early_section": res_dict["conclusion_in_early_section"],

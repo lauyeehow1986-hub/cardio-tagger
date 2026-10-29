@@ -13,7 +13,7 @@ This feature extends the Cardio-Tagger pipeline to automatically extract essenti
 2. **`nric`**: Singapore National Registration Identity Card / FIN / Temporary IDs:
    - Standard NRIC/FIN: `S1234567A`, `T0123456B`, `F1234567M`, `G1234567A`, `M1234567A`.
    - Masked NRIC/FIN: `S****567A`, `T****123B`, etc.
-   - Temporary Hospital NRIC: Starting with `X` or `Y`, up to 12 characters total, ending with an alphabet (e.g., `X1234567A`, `Y1234567890A`, `X****567A`).
+   - Temporary Hospital NRIC: Starting with `X` or `Y`, up to 13 characters total, ending with an alphabet (e.g., `X1234567A`, `X01234567891A`, `Y1234567890A`, `X****567A`).
 3. **`patient_id`**: Hospital Registration Number, MRN, or Case Number.
 4. **`procedure_date`**: Date the procedure/study was performed, normalized to ISO `YYYY-MM-DD`.
 5. **`report_date`**: Date the report was created/verified, normalized to ISO `YYYY-MM-DD`.
@@ -32,8 +32,8 @@ The extractor analyzes the first 2,500 characters of Page 1 or all text prior to
 #### A. NRIC / FIN Extraction
 - **Standard & Masked NRIC**:
   `r"(?i)\b(?P<nric>[STFGM](?:[0-9]{7}|[\*X]{4}[0-9]{3})[A-Z])\b"`
-- **Temporary X/Y NRIC (up to 12 chars, ending with alphabet)**:
-  `r"(?i)\b(?P<nric_temp>[XY][0-9A-Z\*]{5,10}[A-Z])\b"`
+- **Temporary X/Y NRIC (up to 13 chars, ending with alphabet)**:
+  `r"(?i)\b(?P<nric_temp>[XY][0-9A-Z\*]{6,11}[A-Z])\b"`
 - **Contextual Label Match**:
   Under `NRIC:`, `FIN:`, `Identity No:`, `ID No:`, `NRIC/FIN:`, `National ID:`.
 

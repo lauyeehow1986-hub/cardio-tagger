@@ -29,9 +29,11 @@ except ImportError:
 try:
     from .section_parser import ClinicalSectionParser, ParsedDocument
     from .echo_lvef import EchoLVEFExtractor, EchoLVEFResult
+    from .patient_demographics import PatientDemographicsExtractor, PatientDemographicsResult
 except ImportError:
     from section_parser import ClinicalSectionParser, ParsedDocument
     from echo_lvef import EchoLVEFExtractor, EchoLVEFResult
+    from patient_demographics import PatientDemographicsExtractor, PatientDemographicsResult
 
 
 @dataclass
@@ -71,6 +73,13 @@ class DocumentTagResult:
     lvef_numeric: Optional[float] = None
     lvef_method: str = "NONE"
     lvef_section: str = "NONE"
+    patient_name: str = ""
+    nric: str = ""
+    patient_id: str = ""
+    procedure_date: str = ""
+    report_date: str = ""
+    procedure_type: str = "OTHER"
+    procedure_title: str = ""
 
 
 class CascadingCardioSieve:
@@ -172,6 +181,7 @@ class CascadingCardioSieve:
         self.ontology = ontology
         self.section_parser = ClinicalSectionParser()
         self.echo_lvef_extractor = EchoLVEFExtractor()
+        self.demographics_extractor = PatientDemographicsExtractor()
         self.enable_gliner = enable_gliner
         self.enable_ollama = enable_ollama
         self.ollama_endpoint = ollama_endpoint
@@ -283,6 +293,10 @@ class CascadingCardioSieve:
         # Extract dedicated Echocardiographic LVEF with hierarchical section/method ranking
         echo_lvef = self.echo_lvef_extractor.extract(parsed)
 
+        # Extract patient demographics, study dates, and procedure modality from Page 1
+        page1_str = page_texts[0] if page_texts else ""
+        demographics = self.demographics_extractor.extract(page1_str)
+
         elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 3)
         return DocumentTagResult(
             pdf_path=pdf_path,
@@ -302,6 +316,13 @@ class CascadingCardioSieve:
             lvef_numeric=echo_lvef.lvef_numeric,
             lvef_method=echo_lvef.lvef_method,
             lvef_section=echo_lvef.lvef_section,
+            patient_name=demographics.patient_name,
+            nric=demographics.nric,
+            patient_id=demographics.patient_id,
+            procedure_date=demographics.procedure_date,
+            report_date=demographics.report_date,
+            procedure_type=demographics.procedure_type,
+            procedure_title=demographics.procedure_title,
         )
 
     def _scan_sections_for_concept(
