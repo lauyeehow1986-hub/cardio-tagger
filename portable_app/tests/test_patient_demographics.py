@@ -74,3 +74,54 @@ def test_masked_nric():
     assert r.patient_id == "H55432"
     assert r.procedure_date == "2026-11-04"
     assert r.procedure_type == "STRESS_ECHO"
+
+
+def test_patient_colon_variations():
+    extractor = PatientDemographicsExtractor()
+    assert extractor._extract_patient_name("Patient: Tan Ah Kow") == "TAN AH KOW"
+    assert extractor._extract_patient_name("patient: Tan Ah Kow") == "TAN AH KOW"
+    assert extractor._extract_patient_name("PATIENT: Tan Ah Kow") == "TAN AH KOW"
+    assert extractor._extract_patient_name("Pt: Tan Ah Kow") == "TAN AH KOW"
+    assert extractor._extract_patient_name("pt: Tan Ah Kow") == "TAN AH KOW"
+    assert extractor._extract_patient_name("Patient : Tan Ah Kow") == "TAN AH KOW"
+    assert extractor._extract_patient_name("Patient:Tan Ah Kow") == "TAN AH KOW"
+
+
+def test_patient_colon_next_line():
+    extractor = PatientDemographicsExtractor()
+    t1 = "Patient:\nTan Ah Kow\nNRIC: S1234567A"
+    assert extractor._extract_patient_name(t1) == "TAN AH KOW"
+
+    t2 = "Patient Name:\nTan Ah Kow\nDOB: 12/03/1960"
+    assert extractor._extract_patient_name(t2) == "TAN AH KOW"
+
+
+def test_patient_colon_disambiguation():
+    extractor = PatientDemographicsExtractor()
+    t1 = "Patient Type: Inpatient\nPatient: Tan Ah Kow"
+    assert extractor._extract_patient_name(t1) == "TAN AH KOW"
+
+    t2 = "PATIENT DEMOGRAPHICS\nPatient: Tan Ah Kow"
+    assert extractor._extract_patient_name(t2) == "TAN AH KOW"
+
+    t3 = "PATIENT DETAILS\nPatient: Tan Ah Kow"
+    assert extractor._extract_patient_name(t3) == "TAN AH KOW"
+
+
+def test_patient_colon_inline_delimiters():
+    extractor = PatientDemographicsExtractor()
+    assert extractor._extract_patient_name("Patient: Tan Ah Kow  Gender: Male") == "TAN AH KOW"
+    assert extractor._extract_patient_name("Patient: Tan Ah Kow  IC: S1234567A") == "TAN AH KOW"
+    assert extractor._extract_patient_name("Patient: Tan Ah Kow  Bed: 10") == "TAN AH KOW"
+    assert extractor._extract_patient_name("Patient: Tan Ah Kow  Ward: 5") == "TAN AH KOW"
+    assert extractor._extract_patient_name("Patient: Tan Ah Kow  Case No: 9912") == "TAN AH KOW"
+    assert extractor._extract_patient_name("Patient: Tan Ah Kow | MRN: 9028192 | Date: 2026-03-15") == "TAN AH KOW"
+
+
+def test_patient_name_aliases_and_titles():
+    extractor = PatientDemographicsExtractor()
+    assert extractor._extract_patient_name("Patient: Tan Ah Kow @ Peter Tan") == "TAN AH KOW @ PETER TAN"
+    assert extractor._extract_patient_name("Patient: Tan Ah Kow (Peter)") == "TAN AH KOW (PETER)"
+    assert extractor._extract_patient_name("Patient: Tan Ah Kow (Mr)") == "TAN AH KOW"
+    assert extractor._extract_patient_name("Patient: Tan Ah Kow, Mdm") == "TAN AH KOW"
+

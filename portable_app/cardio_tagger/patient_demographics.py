@@ -45,11 +45,29 @@ class PatientDemographicsExtractor:
     )
 
     NAME_LABEL_PATTERN = re.compile(
-        r"(?im)\b(?:PATIENT[\t ]+NAME|PT[\t ]+NAME|NAME[\t ]+OF[\t ]+PATIENT|PATIENT|NAME)[\t ]*[:=\-]?[\t ]*(?P<val>[A-Z\s,.'\-/]{2,50})"
+        r"(?im)\b(?P<label>PATIENT[\t ]+NAME|PT[\t ]+NAME|NAME[\t ]+OF[\t ]+PATIENT|PATIENT(?:[\t ]*/[\t ]*(?:NRIC|FIN|IC|MRN|ID))?|PT|NAME)[\t ]*[:=\-][\t ]*(?P<val>[A-Za-z\s,.\x27\-/@()]{2,60})|"
+        r"\b(?P<label2>PATIENT[\t ]+NAME|PT[\t ]+NAME|NAME[\t ]+OF[\t ]+PATIENT)[\t ]+(?P<val2>[A-Za-z\s,.\x27\-/@()]{2,60})"
+    )
+
+    NAME_LINE_ONLY_LABEL = re.compile(
+        r"(?i)^\s*(?:PATIENT[\t ]+NAME|PT[\t ]+NAME|NAME[\t ]+OF[\t ]+PATIENT|PATIENT|PT|NAME)\s*[:=\-]?\s*$"
+    )
+
+    NAME_DELIMITER_SPLIT = re.compile(
+        r"(?i)(?:"
+        r"\t+|"
+        r"\s{2,}(?:[A-Z][a-z0-9\-]*\s*[:=\-])|"
+        r"\s{3,}|"
+        r"\s*[|;]\s*|"
+        r"\s*[,|\-]?\s*(?:NRIC|FIN|IC|MRN|DOB|SEX|GENDER|AGE|HOSP|DATE|ID|REF|BED|WARD|CASE|RN|ACCT|ROOM|LOC)\b|"
+        r"\s*/\s*(?:[STFGM][0-9*]|[XY][0-9A-Z*]|MRN|\d)"
+        r")"
     )
 
     EXCLUDE_NAME_WORDS = re.compile(
-        r"(?i)\b(?:DOCTOR|PHYSICIAN|ATTENDING|SONOGRAPHER|CARDIOLOGIST|REFERRING|FELLOW|REGISTRAR|CLINICIAN|HOSPITAL|CENTRE|DEPARTMENT|REPORT|DATE|NRIC|MRN|SEX|AGE|DOB|GENDER)\b"
+        r"(?i)\b(?:DOCTOR|PHYSICIAN|ATTENDING|SONOGRAPHER|CARDIOLOGIST|REFERRING|FELLOW|REGISTRAR|CLINICIAN|"
+        r"HOSPITAL|CENTRE|DEPARTMENT|REPORT|DATE|NRIC|MRN|SEX|AGE|DOB|GENDER|"
+        r"TYPE|CLASS|CATEGORY|LOCATION|WARD|BED|STATUS|INFORMATION|PARTICULARS|DEMOGRAPHICS|PROFILE|DETAILS|SUMMARY)\b"
     )
 
     PROC_DATE_LABEL_PATTERN = re.compile(
@@ -155,29 +173,48 @@ class PatientDemographicsExtractor:
                 return val
         return ""
 
+    def _clean_patient_name(self, raw_val: str) -> str:
+        # Cut at column delimiters or next field labels
+        cleaned = self.NAME_DELIMITER_SPLIT.split(raw_val)[0].strip()
+        # Clean clinical titles and honorifics
+        cleaned = re.sub(
+            r"(?i)\b(?:MR|MRS|MDM|MS|MISS|DR|PROF|A/PROF|ASSOC[\t ]+PROF|MD)\b[\.,]?",
+            "",
+            cleaned,
+        )
+        # Clean leftover empty parentheses from removed titles e.g. (MR) -> ()
+        cleaned = re.sub(r"\(\s*\)", "", cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,.-")
+
+        # Validate plausibility
+        if len(cleaned) >= 2 and re.search(r"[A-Za-z]", cleaned):
+            if not self.EXCLUDE_NAME_WORDS.search(cleaned):
+                return cleaned.upper()
+        return ""
+
     def _extract_patient_name(self, text: str) -> str:
         lines = [line.strip() for line in text.splitlines() if line.strip()]
-        for line in lines:
+        for i, line in enumerate(lines):
+            # 1. Inline match (e.g. "Patient: Tan Ah Kow", "Patient Name: Tan Ah Kow")
             m = self.NAME_LABEL_PATTERN.search(line)
             if m:
-                raw_val = m.group("val")
-                # Cut at common column delimiters (multiple spaces, tabs, next field labels)
-                cleaned = re.split(
-                    r"(?i)(?:\t+|\s{3,}|(?:\s+(?:NRIC|MRN|DOB|SEX|AGE|HOSP|DATE|ID|REF)\b))",
-                    raw_val,
-                )[0].strip()
+                raw_val = m.group("val") or m.group("val2")
+                cand = self._clean_patient_name(raw_val)
+                if cand:
+                    return cand
 
-                # Clean titles and punctuation
-                cleaned = re.sub(
-                    r"(?i)\b(?:MR|MRS|MDM|MS|MISS|DR|PROF|A/PROF|MD)\b[\.,]?",
-                    "",
-                    cleaned,
-                ).strip(" ,.-")
-
-                # Validate plausibility (has letters, not an excluded term)
-                if len(cleaned) >= 2 and re.search(r"[A-Za-z]", cleaned):
-                    if not self.EXCLUDE_NAME_WORDS.search(cleaned):
-                        return cleaned.upper()
+            # 2. Next-line match when label is on its own line (e.g. "Patient:\nTan Ah Kow")
+            if self.NAME_LINE_ONLY_LABEL.match(line):
+                for next_idx in range(i + 1, min(i + 3, len(lines))):
+                    next_line = lines[next_idx]
+                    # Ensure next line is not another section header or label
+                    if not re.search(
+                        r"(?i)^\s*(?:NRIC|FIN|IC|MRN|DOB|SEX|GENDER|AGE|HOSP|DATE|ID|REF|INDICATION|CLINICAL|PROCEDURE|FINDINGS|REPORT)\b",
+                        next_line,
+                    ):
+                        cand = self._clean_patient_name(next_line)
+                        if cand:
+                            return cand
         return ""
 
     def _extract_dates(self, text: str) -> Tuple[str, str]:
