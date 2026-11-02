@@ -296,6 +296,34 @@ def test_demographics_sieve_integration():
     assert res.staged_pci_status == "AFFIRMED_PLANNED"
 
 
+def test_coronary_stenosis_sieve_integration():
+    sieve = get_sieve()
+    text = (
+        "CARDIAC CATHETERIZATION REPORT\n"
+        "FINDINGS:\n"
+        "LMCA: Normal.\n"
+        "LAD: 80% proximal stenosis, 50% mid lesion.\n"
+        "LCx: Small caliber with 70-90% lesion.\n"
+        "RCA: 100% total occlusion.\n\n"
+        "CONCLUSION:\n"
+        "1. Two-vessel CAD.\n"
+        "2. Successful primary PCI to culprit LAD.\n"
+        "3. Residual small LCx 70-90% stenosis and RPL1 70% disease; plan staged PCI."
+    )
+    res = sieve.evaluate_document("cath_stenosis.pdf", [text])
+    # Findings scope
+    assert "PROXIMAL LAD: 80%" in res.findings_lad_stenosis
+    assert "MID LAD: 50%" in res.findings_lad_stenosis
+    assert "SMALL LCX: 70-90%" in res.findings_lcx_stenosis
+    assert "RCA: 100% TOTAL OCCLUSION" in res.findings_rca_stenosis
+    assert res.findings_lmca_stenosis == "LMCA: NORMAL"
+
+    # Conclusion scope
+    assert "SMALL LCX: 70-90%" in res.conclusion_lcx_stenosis
+    assert "RPL1: 70%" in res.conclusion_rca_stenosis
+
+
+
 
 
 if __name__ == "__main__":

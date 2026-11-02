@@ -30,10 +30,13 @@ try:
     from .section_parser import ClinicalSectionParser, ParsedDocument
     from .echo_lvef import EchoLVEFExtractor, EchoLVEFResult
     from .patient_demographics import PatientDemographicsExtractor, PatientDemographicsResult
+    from .coronary_stenosis import CoronaryStenosisExtractor, CoronaryStenosisResult
 except ImportError:
     from section_parser import ClinicalSectionParser, ParsedDocument
     from echo_lvef import EchoLVEFExtractor, EchoLVEFResult
     from patient_demographics import PatientDemographicsExtractor, PatientDemographicsResult
+    from coronary_stenosis import CoronaryStenosisExtractor, CoronaryStenosisResult
+
 
 
 @dataclass
@@ -80,6 +83,17 @@ class DocumentTagResult:
     report_date: str = ""
     procedure_type: str = "OTHER"
     procedure_title: str = ""
+    conclusion_lmca_stenosis: str = ""
+    conclusion_lad_stenosis: str = ""
+    conclusion_lcx_stenosis: str = ""
+    conclusion_rca_stenosis: str = ""
+    conclusion_graft_stenosis: str = ""
+    findings_lmca_stenosis: str = ""
+    findings_lad_stenosis: str = ""
+    findings_lcx_stenosis: str = ""
+    findings_rca_stenosis: str = ""
+    findings_graft_stenosis: str = ""
+
 
 
 class CascadingCardioSieve:
@@ -182,6 +196,8 @@ class CascadingCardioSieve:
         self.section_parser = ClinicalSectionParser()
         self.echo_lvef_extractor = EchoLVEFExtractor()
         self.demographics_extractor = PatientDemographicsExtractor()
+        self.stenosis_extractor = CoronaryStenosisExtractor()
+
         self.enable_gliner = enable_gliner
         self.enable_ollama = enable_ollama
         self.ollama_endpoint = ollama_endpoint
@@ -297,6 +313,12 @@ class CascadingCardioSieve:
         page1_str = page_texts[0] if page_texts else ""
         demographics = self.demographics_extractor.extract(page1_str)
 
+        # Extract coronary vessel stenosis for Conclusion and Diagnostic Findings scopes
+        stenosis_res = self.stenosis_extractor.extract(
+            conclusion_text=parsed.conclusion_text,
+            findings_text=parsed.findings_text,
+        )
+
         elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 3)
         return DocumentTagResult(
             pdf_path=pdf_path,
@@ -323,7 +345,18 @@ class CascadingCardioSieve:
             report_date=demographics.report_date,
             procedure_type=demographics.procedure_type,
             procedure_title=demographics.procedure_title,
+            conclusion_lmca_stenosis=stenosis_res.conclusion_lmca_stenosis,
+            conclusion_lad_stenosis=stenosis_res.conclusion_lad_stenosis,
+            conclusion_lcx_stenosis=stenosis_res.conclusion_lcx_stenosis,
+            conclusion_rca_stenosis=stenosis_res.conclusion_rca_stenosis,
+            conclusion_graft_stenosis=stenosis_res.conclusion_graft_stenosis,
+            findings_lmca_stenosis=stenosis_res.findings_lmca_stenosis,
+            findings_lad_stenosis=stenosis_res.findings_lad_stenosis,
+            findings_lcx_stenosis=stenosis_res.findings_lcx_stenosis,
+            findings_rca_stenosis=stenosis_res.findings_rca_stenosis,
+            findings_graft_stenosis=stenosis_res.findings_graft_stenosis,
         )
+
 
     def _scan_sections_for_concept(
         self, concept_key: str, cdef: Dict[str, Any], sections: List[Any]
