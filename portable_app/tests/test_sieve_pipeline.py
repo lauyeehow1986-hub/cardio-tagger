@@ -241,6 +241,17 @@ def test_csv_input_processing(tmp_path):
         assert reader[0]["staged_pci_detected"] == "True"
         assert reader[0]["staged_pci_status"] == "AFFIRMED_PLANNED"
         assert "LAD" in reader[0]["staged_pci_vessels"]
+        assert "conclusion_lad_stenosis" in reader[0]
+        assert "findings_lad_stenosis" in reader[0]
+        assert "conclusion_rca_stenosis" in reader[0]
+        assert "findings_rca_stenosis" in reader[0]
+        assert "conclusion_lcx_stenosis" in reader[0]
+        assert "findings_lcx_stenosis" in reader[0]
+        assert "conclusion_lmca_stenosis" in reader[0]
+        assert "findings_lmca_stenosis" in reader[0]
+        assert "conclusion_graft_stenosis" in reader[0]
+        assert "findings_graft_stenosis" in reader[0]
+
 
         # Row 2 (PT_102): Heart Failure + AFib, No Staged PCI
         assert reader[1]["patient_id"] == "PT_102"

@@ -452,6 +452,16 @@ def main():
             "lvef_numeric",
             "lvef_method",
             "lvef_section",
+            "conclusion_lmca_stenosis",
+            "conclusion_lad_stenosis",
+            "conclusion_lcx_stenosis",
+            "conclusion_rca_stenosis",
+            "conclusion_graft_stenosis",
+            "findings_lmca_stenosis",
+            "findings_lad_stenosis",
+            "findings_lcx_stenosis",
+            "findings_rca_stenosis",
+            "findings_graft_stenosis",
             "detected_cardio_concepts",
             "conclusion_found",
             "peak_tier_used",
@@ -503,7 +513,18 @@ def main():
                         row_out["lvef_numeric"] = res_dict.get("lvef_numeric")
                         row_out["lvef_method"] = res_dict.get("lvef_method", "NONE")
                         row_out["lvef_section"] = res_dict.get("lvef_section", "NONE")
+                        row_out["conclusion_lmca_stenosis"] = res_dict.get("conclusion_lmca_stenosis", "")
+                        row_out["conclusion_lad_stenosis"] = res_dict.get("conclusion_lad_stenosis", "")
+                        row_out["conclusion_lcx_stenosis"] = res_dict.get("conclusion_lcx_stenosis", "")
+                        row_out["conclusion_rca_stenosis"] = res_dict.get("conclusion_rca_stenosis", "")
+                        row_out["conclusion_graft_stenosis"] = res_dict.get("conclusion_graft_stenosis", "")
+                        row_out["findings_lmca_stenosis"] = res_dict.get("findings_lmca_stenosis", "")
+                        row_out["findings_lad_stenosis"] = res_dict.get("findings_lad_stenosis", "")
+                        row_out["findings_lcx_stenosis"] = res_dict.get("findings_lcx_stenosis", "")
+                        row_out["findings_rca_stenosis"] = res_dict.get("findings_rca_stenosis", "")
+                        row_out["findings_graft_stenosis"] = res_dict.get("findings_graft_stenosis", "")
                         row_out["detected_cardio_concepts"] = concept_dict["detected_cardio_concepts"]
+
                         row_out["conclusion_found"] = res_dict["conclusion_found"]
                         row_out["peak_tier_used"] = res_dict["peak_tier_used"]
                         row_out["processing_ms"] = res_dict["processing_ms"]
@@ -568,7 +589,18 @@ def main():
             "lvef_numeric",
             "lvef_method",
             "lvef_section",
+            "conclusion_lmca_stenosis",
+            "conclusion_lad_stenosis",
+            "conclusion_lcx_stenosis",
+            "conclusion_rca_stenosis",
+            "conclusion_graft_stenosis",
+            "findings_lmca_stenosis",
+            "findings_lad_stenosis",
+            "findings_lcx_stenosis",
+            "findings_rca_stenosis",
+            "findings_graft_stenosis",
             "detected_cardio_concepts",
+
             "matched_concepts_count",
             "peak_tier_used",
             "processing_ms",
@@ -619,7 +651,18 @@ def main():
                             "lvef_numeric": res_dict.get("lvef_numeric"),
                             "lvef_method": res_dict.get("lvef_method", "NONE"),
                             "lvef_section": res_dict.get("lvef_section", "NONE"),
+                            "conclusion_lmca_stenosis": res_dict.get("conclusion_lmca_stenosis", ""),
+                            "conclusion_lad_stenosis": res_dict.get("conclusion_lad_stenosis", ""),
+                            "conclusion_lcx_stenosis": res_dict.get("conclusion_lcx_stenosis", ""),
+                            "conclusion_rca_stenosis": res_dict.get("conclusion_rca_stenosis", ""),
+                            "conclusion_graft_stenosis": res_dict.get("conclusion_graft_stenosis", ""),
+                            "findings_lmca_stenosis": res_dict.get("findings_lmca_stenosis", ""),
+                            "findings_lad_stenosis": res_dict.get("findings_lad_stenosis", ""),
+                            "findings_lcx_stenosis": res_dict.get("findings_lcx_stenosis", ""),
+                            "findings_rca_stenosis": res_dict.get("findings_rca_stenosis", ""),
+                            "findings_graft_stenosis": res_dict.get("findings_graft_stenosis", ""),
                             "detected_cardio_concepts": concept_dict["detected_cardio_concepts"],
+
                             "matched_concepts_count": len(res_dict["all_concept_matches"]),
                             "peak_tier_used": res_dict["peak_tier_used"],
                             "processing_ms": res_dict["processing_ms"],
