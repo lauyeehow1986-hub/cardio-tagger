@@ -327,7 +327,7 @@ def test_coronary_stenosis_sieve_integration():
     assert "MID LAD: 50%" in res.findings_lad_stenosis
     assert "SMALL LCX: 70-90%" in res.findings_lcx_stenosis
     assert "RCA: 100% TOTAL OCCLUSION" in res.findings_rca_stenosis
-    assert res.findings_lmca_stenosis == "LMCA: NORMAL"
+    assert res.findings_lmca_stenosis == "LMCA: 0%"
 
     # Conclusion scope
     assert "SMALL LCX: 70-90%" in res.conclusion_lcx_stenosis

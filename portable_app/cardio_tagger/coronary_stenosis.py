@@ -69,14 +69,22 @@ class CoronaryStenosisExtractor:
     )
 
     VESSEL_NAME_PATTERN = re.compile(
-        rf"(?i)\b(?P<vessel>(?:the\s+)?(?:{MODIFIERS}[\s\-]+)*(?:{VESSEL_CORE})(?:[\s\-]+{MODIFIERS})*)\b"
+        rf"(?i)\b(?P<vessel>(?:the\s+)?(?:(?:ostium|origin)\s+of\s+(?:the\s+)?)?(?:{MODIFIERS}[\s\-]+)*(?:{VESSEL_CORE})(?:[\s\-]+{MODIFIERS})*)\b"
     )
 
     QUAL_PREFIX = r"(?:non[\-\s]flow[\-\s]limiting|non[\-\s]significant|mild(?:[\-\s]to[\-\s]moderate)?|moderate(?:[\-\s]to[\-\s]severe)?|severe|critical)"
-    PCT_BODY = r"(?:(?:less\s+than\s*|greater\s+than\s*|[<>~]=?\s*|approx(?:imately)?\s*|up\s+to\s*)?[0-9]{1,3}(?:\s*(?:-|to|\/)\s*[0-9]{1,3})?\s*%)"
+    PCT_BODY = r"(?:(?:less\s+than\s*|greater\s+than\s*|[<>~]=?\s*|approx(?:imately)?\.?\s*|up\s+to\s*)?[0-9]{1,3}(?:\s*(?:-|to|\/)\s*[0-9]{1,3})?\s*%)"
     OCCL_PATTERN = r"(?:100%\s*(?:CTO|chronic\s+total\s+occlusion|total\s+occlusion|occlusion|occluded)|total(?:ly)?\s+occlu(?:ded|sion)|chronic\s+total\s+occlusion|CTO|subtotal(?:ly)?\s+occlu(?:ded|sion)|99%\s*(?:critical|stenosis)?)"
     STENT_PATTERN = r"(?:patent\s+stent|stent\s+is\s+patent|patent\s+des|patent|in[\-\s]?stent\s+restenosis|isr)"
     STANDALONE_QUAL = r"(?:severe\s+(?:stenosis|disease|narrowing|lesion)|moderate\s+(?:stenosis|disease|narrowing|lesion)|mild\s+(?:stenosis|disease|narrowing|lesion|plaque))"
+    ZERO_STENOSIS_PATTERN = (
+        r"(?:(?:angiographically\s+)?normal(?!\s+(?:anterograde\s+)?flow)(?:\s+coronar(?:y|ies))?|"
+        r"without\s+(?:significant\s+)?(?:stenosis|disease|narrowing|lesion)|"
+        r"no\s+(?:significant\s+)?(?:stenosis|disease|narrowing|lesion)|"
+        r"free\s+of\s+(?:(?:in[\-\s]?stent\s+)?restenosis|disease|stenosis)|"
+        r"no\s+(?:in[\-\s]?stent\s+)?restenosis|"
+        r"without\s+(?:in[\-\s]?stent\s+)?restenosis)"
+    )
 
     ALL_STENOSIS_PATTERN = re.compile(
         rf"(?i)(?P<stenosis>"
@@ -85,7 +93,8 @@ class CoronaryStenosisExtractor:
         rf"(?:{QUAL_PREFIX}\s*(?:\(\s*{PCT_BODY}(?:\s+stenosis)?\s*\)|\s+{PCT_BODY}))|"
         rf"(?:\(\s*{PCT_BODY}(?:\s+stenosis)?\s*\))|"
         rf"{PCT_BODY}|"
-        rf"{STANDALONE_QUAL}"
+        rf"{STANDALONE_QUAL}|"
+        rf"{ZERO_STENOSIS_PATTERN}"
         rf")"
     )
 
@@ -113,7 +122,7 @@ class CoronaryStenosisExtractor:
         p = p.strip()
         p = re.sub(r"(?i)\bless\s+than\s*", "<", p)
         p = re.sub(r"(?i)\bgreater\s+than\s*", ">", p)
-        p = re.sub(r"(?i)\bapprox(?:imately)?\s*", "APPROX ", p)
+        p = re.sub(r"(?i)\bapprox(?:imately)?\.?\s*", "APPROX ", p)
         p = re.sub(r"\s+", " ", p)
         p = re.sub(r"<\s+", "<", p)
         p = re.sub(r">\s+", ">", p)
@@ -123,6 +132,8 @@ class CoronaryStenosisExtractor:
     def _normalize_stenosis_desc(self, s_raw: str) -> str:
         s = s_raw.strip().upper()
         s = re.sub(r"\s+", " ", s)
+        if re.search(rf"(?i)\b{self.ZERO_STENOSIS_PATTERN}\b", s):
+            return "0%"
         if re.search(r"(?i)total\s+occlusion|totally\s+occluded", s):
             if "100%" not in s and "SUBTOTAL" not in s:
                 return "TOTAL OCCLUSION"
@@ -167,6 +178,7 @@ class CoronaryStenosisExtractor:
         v = re.sub(r"^(?:THE|A|AN)\s+", "", v)
         v = re.sub(r"\s+(?:CORONARY\s+)?(?:ARTERY|BRANCH|VESSEL)$", "", v)
         v = re.sub(r"\s*-\s*", " ", v)
+        v = re.sub(r"^(?:THE\s+)?(?:OSTIUM|ORIGIN)\s+OF\s+(?:THE\s+)?", "OSTIAL ", v)
 
         # Grafts
         m_graft = re.match(
@@ -264,7 +276,11 @@ class CoronaryStenosisExtractor:
 
         for l in lines:
             l_clean = re.sub(r"^\s*[0-9]+[\.\)]\s*", "", l)
-            sub_chunks = [sc.strip() for sc in re.split(r"\.\s+", l_clean) if sc.strip()]
+            sub_chunks = [
+                sc.strip()
+                for sc in re.split(r"(?<!\bapprox)(?<!\best)(?<!\bdr)(?<!\bmr)\.\s+", l_clean, flags=re.I)
+                if sc.strip()
+            ]
             for chunk in sub_chunks:
                 # 1. Header check: e.g. "LAD: 80% proximal stenosis, 50% mid lesion." or "LMCA: Normal."
                 m_head = re.match(
@@ -277,9 +293,9 @@ class CoronaryStenosisExtractor:
                     rest = m_head.group("rest")
                     clauses = [c.strip() for c in re.split(r"[,;]+", rest) if c.strip()]
                     for cl in clauses:
-                        if re.search(r"(?i)\b(?:normal|no\s+(?:significant\s+)?stenosis)\b", cl):
+                        if re.search(rf"(?i)\b{self.ZERO_STENOSIS_PATTERN}\b", cl):
                             if not re.search(r"(?i)\b(?:flow|timi)\b", cl):
-                                entry = f"{base_v}: NORMAL"
+                                entry = f"{base_v}: 0%"
                                 if (terr, entry) not in seen_entries:
                                     seen_entries.add((terr, entry))
                                     results[terr].append(entry)
@@ -331,7 +347,7 @@ class CoronaryStenosisExtractor:
                         continue
                     st_val = self._normalize_stenosis_desc(st_m.group("stenosis"))
                     tail = chunk[st_m.end(): st_m.end() + 60]
-                    m_prep = re.match(r"^\s*(?:of|in|to|at)\s+(?P<after>.*)", tail, re.I)
+                    m_prep = re.match(r"^\s*(?:(?:of|in|to|at)\s+)?(?P<after>.*)", tail, re.I)
                     if m_prep:
                         after_text = m_prep.group("after")
                         m_v = self.VESSEL_NAME_PATTERN.search(after_text)
@@ -344,4 +360,12 @@ class CoronaryStenosisExtractor:
                                     seen_entries.add((terr, entry))
                                     results[terr].append(entry)
 
-        return results
+        # Clean redundant patent entries if explicit percentage or 0% exists for that vessel
+        cleaned_results: Dict[str, List[str]] = {}
+        for terr, entries in results.items():
+            pct_vessels = {e.split(": ", 1)[0] for e in entries if ": " in e and "%" in e.split(": ", 1)[1]}
+            cleaned_results[terr] = [
+                e for e in entries
+                if not (": " in e and e.split(": ", 1)[1] in ("PATENT", "PATENT STENT") and e.split(": ", 1)[0] in pct_vessels)
+            ]
+        return cleaned_results

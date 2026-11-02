@@ -96,7 +96,7 @@ def test_dual_scopes_conclusion_vs_findings():
     assert "MID LAD: 50%" in res.findings_lad_stenosis
     assert "SMALL LCX: 70-90%" in res.findings_lcx_stenosis
     assert "RCA: 100% TOTAL OCCLUSION" in res.findings_rca_stenosis
-    assert res.findings_lmca_stenosis == "LMCA: NORMAL"
+    assert res.findings_lmca_stenosis == "LMCA: 0%"
 
     # Conclusion scope
     assert "SMALL LCX: 70-90%" in res.conclusion_lcx_stenosis
@@ -150,6 +150,35 @@ def test_similar_narratives_across_lcx_rca_lmca_graft():
 
     assert "SVG TO OM1: SEVERE (80-90%)" in res.conclusion_graft_stenosis
     assert "LIMA TO LAD: PATENT" in res.conclusion_graft_stenosis
+
+
+def test_zero_stenosis_normal_without_stenosis_free_of_restenosis():
+    extractor = CoronaryStenosisExtractor()
+    text = (
+        "FINDINGS:\n"
+        "LMCA is normal without stenosis. "
+        "LAD has no significant stenosis. "
+        "RCA without stenosis. "
+        "Patent stent in proximal LCx, free of restenosis."
+    )
+    res = extractor.extract(findings_text=text)
+    assert res.findings_lmca_stenosis == "LMCA: 0%"
+    assert res.findings_lad_stenosis == "LAD: 0%"
+    assert res.findings_rca_stenosis == "RCA: 0%"
+    assert res.findings_lcx_stenosis == "PROXIMAL LCX: 0%"
+
+
+def test_ostium_of_vessel_and_abbreviation_dot():
+    extractor = CoronaryStenosisExtractor()
+    text = (
+        "CONCLUSION:\n"
+        "the ostium of the proximal left anterior descending coronary artery has a moderate(approx. 50%) stenosis. "
+        "Normal anterograde flow."
+    )
+    res = extractor.extract(conclusion_text=text)
+    assert res.conclusion_lad_stenosis == "OSTIAL PROXIMAL LAD: MODERATE (APPROX 50%)"
+    assert res.conclusion_rca_stenosis == ""
+    assert res.conclusion_lcx_stenosis == ""
 
 
 def test_section_parser_findings_and_conclusion_split():
