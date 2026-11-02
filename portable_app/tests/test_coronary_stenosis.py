@@ -37,7 +37,7 @@ def test_occlusions_and_qualitative_states():
     res = extractor.extract(conclusion_text=text, findings_text="")
 
     assert "PROXIMAL RCA: 100% CTO" in res.conclusion_rca_stenosis
-    assert "MID-LAD: TOTAL OCCLUSION" in res.conclusion_lad_stenosis
+    assert "MID LAD: TOTAL OCCLUSION" in res.conclusion_lad_stenosis
     assert "DISTAL LAD: PATENT STENT" in res.conclusion_lad_stenosis
     assert "OSTIAL LCX: SUBTOTAL OCCLUSION" in res.conclusion_lcx_stenosis
     assert "OM1: SEVERE STENOSIS" in res.conclusion_lcx_stenosis
@@ -68,7 +68,7 @@ def test_all_territories_and_grafts():
     res = extractor.extract(conclusion_text=conclusion, findings_text="")
 
     assert "LEFT MAIN: 40%" in res.conclusion_lmca_stenosis
-    assert "MID-LAD: 60%" in res.conclusion_lad_stenosis
+    assert "MID LAD: 60%" in res.conclusion_lad_stenosis
     assert "OM1: 75%" in res.conclusion_lcx_stenosis
     assert "PDA: 70%" in res.conclusion_rca_stenosis
     assert "LIMA TO LAD: PATENT" in res.conclusion_graft_stenosis
@@ -100,8 +100,56 @@ def test_dual_scopes_conclusion_vs_findings():
 
     # Conclusion scope
     assert "SMALL LCX: 70-90%" in res.conclusion_lcx_stenosis
-    # Proximal LAD in conclusion was successful PCI, so residual is LCx
     assert res.conclusion_rca_stenosis == ""
+
+
+def test_user_multiline_vessel_narrative_and_timi_exclusion():
+    extractor = CoronaryStenosisExtractor()
+    narrative = (
+        "prox left anterior descending coronary artery 80% "
+        "mid left anterior descending coronary artery has a moderate(50-70%) stenosis involving origin of first diagonal artery. "
+        "Mid left anterior descending coronary artery has a moderate (approx 50% stenosis). "
+        "Normal anterograde flow(timi 3). "
+        "The first diagonal coronary artery has a non-flow limiting (less than 30% stenosis)."
+    )
+    res = extractor.extract(findings_text=narrative)
+    expected_lad = (
+        "PROXIMAL LAD: 80%; "
+        "MID LAD: MODERATE (50-70%); "
+        "MID LAD: MODERATE (APPROX 50%); "
+        "D1: NON-FLOW LIMITING (<30%)"
+    )
+    assert res.findings_lad_stenosis == expected_lad
+    assert res.findings_lmca_stenosis == ""
+    assert res.findings_lcx_stenosis == ""
+    assert res.findings_rca_stenosis == ""
+    assert res.findings_graft_stenosis == ""
+
+
+def test_similar_narratives_across_lcx_rca_lmca_graft():
+    extractor = CoronaryStenosisExtractor()
+    conclusion = (
+        "CONCLUSION:\n"
+        "1. Proximal circumflex coronary artery 70% stenosis. The first obtuse marginal coronary artery has a non-flow limiting (less than 30% stenosis). Second obtuse marginal branch has a severe (>70%) narrowing.\n"
+        "2. Proximal right coronary artery 90% stenosis. Distal right coronary artery has a moderate (approx 50% stenosis). Posterior descending artery has a mild (20-30% stenosis). First posterolateral branch has a 50% lesion.\n"
+        "3. Left main coronary artery has a mild (approx 20% stenosis).\n"
+        "4. SVG to first obtuse marginal artery has a severe (80-90% stenosis). LIMA to left anterior descending artery is patent."
+    )
+    res = extractor.extract(conclusion_text=conclusion)
+
+    assert "PROXIMAL LCX: 70%" in res.conclusion_lcx_stenosis
+    assert "OM1: NON-FLOW LIMITING (<30%)" in res.conclusion_lcx_stenosis
+    assert "OM2: SEVERE (>70%)" in res.conclusion_lcx_stenosis
+
+    assert "PROXIMAL RCA: 90%" in res.conclusion_rca_stenosis
+    assert "DISTAL RCA: MODERATE (APPROX 50%)" in res.conclusion_rca_stenosis
+    assert "PDA: MILD (20-30%)" in res.conclusion_rca_stenosis
+    assert "RPL1: 50%" in res.conclusion_rca_stenosis
+
+    assert "LEFT MAIN: MILD (APPROX 20%)" in res.conclusion_lmca_stenosis
+
+    assert "SVG TO OM1: SEVERE (80-90%)" in res.conclusion_graft_stenosis
+    assert "LIMA TO LAD: PATENT" in res.conclusion_graft_stenosis
 
 
 def test_section_parser_findings_and_conclusion_split():
@@ -123,4 +171,3 @@ def test_section_parser_findings_and_conclusion_split():
     doc = parser.parse_document("test.pdf", [page1])
     assert "70% mid stenosis" in doc.findings_text
     assert "Two-vessel CAD" in doc.conclusion_text
-
