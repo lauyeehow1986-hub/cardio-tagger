@@ -34,6 +34,21 @@ class ParsedDocument:
     all_sections: Dict[str, List[ExtractedSection]] = field(default_factory=dict)
     used_ocr_fallback: bool = False
 
+    @property
+    def conclusion_text(self) -> str:
+        return "\n\n".join(s.text for s in self.conclusion_sections)
+
+    @property
+    def findings_text(self) -> str:
+        findings_secs = self.all_sections.get("findings", [])
+        if findings_secs:
+            return "\n\n".join(s.text for s in findings_secs)
+        proc_secs = self.all_sections.get("procedure", [])
+        if proc_secs:
+            return "\n\n".join(s.text for s in proc_secs)
+        return ""
+
+
 
 class ClinicalSectionParser:
     """
@@ -169,6 +184,10 @@ class ClinicalSectionParser:
                 page_texts = [f"[ERROR_READING_PDF: {exc}]"]
 
         return self.parse_pages(str(pdf_path), page_texts, used_ocr=used_ocr)
+
+    def parse_document(self, pdf_path: str, page_texts: List[str], used_ocr: bool = False) -> ParsedDocument:
+        """Alias for parse_pages for document text array ingestion."""
+        return self.parse_pages(pdf_path, page_texts, used_ocr=used_ocr)
 
     def parse_pages(self, pdf_path: str, page_texts: List[str], used_ocr: bool = False) -> ParsedDocument:
         total_pages = len(page_texts)

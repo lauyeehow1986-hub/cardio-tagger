@@ -102,3 +102,25 @@ def test_dual_scopes_conclusion_vs_findings():
     assert "SMALL LCX: 70-90%" in res.conclusion_lcx_stenosis
     # Proximal LAD in conclusion was successful PCI, so residual is LCx
     assert res.conclusion_rca_stenosis == ""
+
+
+def test_section_parser_findings_and_conclusion_split():
+    from cardio_tagger.section_parser import ClinicalSectionParser
+    parser = ClinicalSectionParser()
+    page1 = (
+        "CARDIAC CATHETERIZATION REPORT\n"
+        "INDICATIONS: 68M with stable angina.\n"
+        "FINDINGS:\n"
+        "LMCA: Normal.\n"
+        "LAD: 70% mid stenosis.\n"
+        "LCx: Small caliber with 80% lesion.\n"
+        "RCA: 100% total occlusion.\n\n"
+        "CONCLUSION:\n"
+        "1. Two-vessel CAD.\n"
+        "2. Successful PCI to LAD.\n"
+        "3. Plan staged PCI to RCA."
+    )
+    doc = parser.parse_document("test.pdf", [page1])
+    assert "70% mid stenosis" in doc.findings_text
+    assert "Two-vessel CAD" in doc.conclusion_text
+
