@@ -291,6 +291,11 @@ class CoronaryStenosisExtractor:
                 if sc.strip()
             ]
             for chunk in sub_chunks:
+                # Exclude post-PCI residual stenosis from diagnostic pre-PCI stenosis
+                if re.search(r"(?i)\b(?:residual\s+stenosis|residual\s*[:\-\s]+[0-9%<>]|post[\-\s]?(?:pci|stent|angioplasty))\b", chunk):
+                    if not re.search(r"(?i)\b(?:staged|pending|subsequent|untreated)\b", chunk):
+                        continue
+
                 # 1. Header check: e.g. "LAD: 80% proximal stenosis, 50% mid lesion." or "LMCA: Normal."
                 m_head = self.HEADER_VESSEL_PATTERN.match(chunk)
                 if m_head:

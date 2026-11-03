@@ -281,3 +281,16 @@ def test_pci_intervention_section_parsing_and_isolation():
     assert "Residual stenosis 0%" in parsed.pci_text
     assert "CAD s/p PCI to LAD" in parsed.conclusion_text
 
+
+def test_residual_stenosis_ignored_in_diagnostic_scope():
+    from cardio_tagger.coronary_stenosis import CoronaryStenosisExtractor
+    extractor = CoronaryStenosisExtractor()
+    text = (
+        "FINDINGS:\n"
+        "Left Anterior Descending Coronary Artery: 80% proximal LAD stenosis.\n"
+        "Residual stenosis 0% post stent."
+    )
+    res = extractor.extract(findings_text=text)
+    assert res.findings_lad_stenosis == "PROXIMAL LAD: 80%"
+
+
