@@ -31,11 +31,13 @@ try:
     from .echo_lvef import EchoLVEFExtractor, EchoLVEFResult
     from .patient_demographics import PatientDemographicsExtractor, PatientDemographicsResult
     from .coronary_stenosis import CoronaryStenosisExtractor, CoronaryStenosisResult
+    from .pci_intervention import PCIInterventionExtractor, PCIInterventionResult
 except ImportError:
     from section_parser import ClinicalSectionParser, ParsedDocument
     from echo_lvef import EchoLVEFExtractor, EchoLVEFResult
     from patient_demographics import PatientDemographicsExtractor, PatientDemographicsResult
     from coronary_stenosis import CoronaryStenosisExtractor, CoronaryStenosisResult
+    from pci_intervention import PCIInterventionExtractor, PCIInterventionResult
 
 
 
@@ -93,6 +95,14 @@ class DocumentTagResult:
     findings_lcx_stenosis: str = ""
     findings_rca_stenosis: str = ""
     findings_graft_stenosis: str = ""
+    pci_intervened_vessels: str = ""
+    pci_lmca_residual_stenosis: str = ""
+    pci_lad_residual_stenosis: str = ""
+    pci_lcx_residual_stenosis: str = ""
+    pci_rca_residual_stenosis: str = ""
+    pci_graft_residual_stenosis: str = ""
+    pci_success_status: str = ""
+    pci_devices_used: str = ""
 
 
 
@@ -197,6 +207,7 @@ class CascadingCardioSieve:
         self.echo_lvef_extractor = EchoLVEFExtractor()
         self.demographics_extractor = PatientDemographicsExtractor()
         self.stenosis_extractor = CoronaryStenosisExtractor()
+        self.pci_extractor = PCIInterventionExtractor()
 
         self.enable_gliner = enable_gliner
         self.enable_ollama = enable_ollama
@@ -320,6 +331,9 @@ class CascadingCardioSieve:
             findings_text=findings_scope_text,
         )
 
+        # Extract PCI intervention (intervened vessels, granular devices, success outcome, residual stenosis)
+        pci_res = self.pci_extractor.extract(parsed.pci_text)
+
         elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 3)
         return DocumentTagResult(
             pdf_path=pdf_path,
@@ -356,6 +370,14 @@ class CascadingCardioSieve:
             findings_lcx_stenosis=stenosis_res.findings_lcx_stenosis,
             findings_rca_stenosis=stenosis_res.findings_rca_stenosis,
             findings_graft_stenosis=stenosis_res.findings_graft_stenosis,
+            pci_intervened_vessels=pci_res.intervened_vessels,
+            pci_lmca_residual_stenosis=pci_res.lmca_residual_stenosis,
+            pci_lad_residual_stenosis=pci_res.lad_residual_stenosis,
+            pci_lcx_residual_stenosis=pci_res.lcx_residual_stenosis,
+            pci_rca_residual_stenosis=pci_res.rca_residual_stenosis,
+            pci_graft_residual_stenosis=pci_res.graft_residual_stenosis,
+            pci_success_status=pci_res.success_status,
+            pci_devices_used=pci_res.devices_used,
         )
 
 

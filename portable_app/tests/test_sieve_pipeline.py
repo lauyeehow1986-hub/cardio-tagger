@@ -334,7 +334,36 @@ def test_coronary_stenosis_sieve_integration():
     assert "RPL1: 70%" in res.conclusion_rca_stenosis
 
 
-
+def test_pci_intervention_end_to_end_sieve():
+    sieve = get_sieve()
+    text = (
+        "CARDIAC CATHETERIZATION REPORT\n"
+        "PATIENT: WONG AH TECK\n"
+        "NRIC: S1234567A\n\n"
+        "CORONARY ANGIOGRAM:\n"
+        "LAD: 90% proximal stenosis.\n"
+        "RCA: Normal.\n\n"
+        "PCI INTERVENTION:\n"
+        "Proximal LAD:\n"
+        "Guiding catheter: 6Fr EBU 3.5 Launcher (Medtronic)\n"
+        "Balloon: Sapphire NC 3.5 x 15 mm. 18 atm\n"
+        "Drug-eluting stent: Synergy Megatron 4 x 20 mm. 14 atm\n"
+        "Successful angioplasty. Residual stenosis 0%.\n\n"
+        "CONCLUSION:\n"
+        "Successful PCI to proximal LAD."
+    )
+    res = sieve.evaluate_document("pci_test.pdf", [text])
+    # Diagnostic findings preserved
+    assert "PROXIMAL LAD: 90%" in res.findings_lad_stenosis
+    assert "RCA: 0%" in res.findings_rca_stenosis
+    # PCI residual stenosis strictly separated
+    assert res.pci_lad_residual_stenosis == "PROXIMAL LAD: 0%"
+    assert res.pci_rca_residual_stenosis == ""
+    assert res.pci_intervened_vessels == "PROXIMAL LAD"
+    assert "PROXIMAL LAD: SUCCESSFUL ANGIOPLASTY" in res.pci_success_status
+    assert "[GUIDING CATHETER]" in res.pci_devices_used
+    assert "[BALLOON]" in res.pci_devices_used
+    assert "[DRUG-ELUTING STENT]" in res.pci_devices_used
 
 
 if __name__ == "__main__":
