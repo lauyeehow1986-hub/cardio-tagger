@@ -91,7 +91,15 @@ class ClinicalSectionParser:
         ),
         "findings": re.compile(
             r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:"
-            r"CORONARY[\t ]+ANGIOGRAPHY|ANGIOGRAPHIC[\t ]+FINDINGS?|FINDINGS?|CORONARY[\t ]+ANATOMY|"
+            r"CORONARY[\t ]+ANGIOGRAPHY(?:[\t ]+FINDINGS?)?|"
+            r"CORONARY[\t ]+ANGIOGRAM(?:[\t ]+FINDINGS?)?|"
+            r"ANGIOGRAPHIC(?:[\t ]+FINDINGS?|[\t ]+DESCRIPTION|[\t ]+DATA)?|"
+            r"CORONARY[\t ]+ANATOMY|"
+            r"CORONARY[\t ]+ARTERIES|"
+            r"VESSELS(?:[\t ]+EXAMINED)?|"
+            r"VESSEL[\t ]+FINDINGS?|"
+            r"FINDINGS?|"
+            r"CORONARY[\t ]+VESSELS?|"
             r"LEFT[\t ]+VENTRICLE|LV[\t ]+SYSTOLIC[\t ]+FUNCTION|VENTRICULAR[\t ]+FUNCTION|LV[\t ]+FUNCTION|"
             r"LEFT[\t ]+VENTRICULAR[\t ]+FUNCTION|WALL[\t ]+MOTION[\t ]+FINDINGS?|WALL[\t ]+MOTION|"
             r"CHAMBERS?|ECHOCARDIOGRAPHIC[\t ]+FINDINGS?|2D[\t ]+FINDINGS?"

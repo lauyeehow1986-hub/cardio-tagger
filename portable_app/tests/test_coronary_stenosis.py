@@ -181,6 +181,65 @@ def test_ostium_of_vessel_and_abbreviation_dot():
     assert res.conclusion_lcx_stenosis == ""
 
 
+def test_circumflex_coronary_artery_variations_and_block_context():
+    extractor = CoronaryStenosisExtractor()
+
+    # 1. User exact sentence standalone
+    text1 = "The ostium of the proximal circumflex coronary artery has a severely calcified 80% stenosis involving the origin of the first obtuse marginal artery"
+    res1 = extractor.extract(findings_text=text1)
+    assert "OSTIAL PROXIMAL LCX" in res1.findings_lcx_stenosis
+    assert "80%" in res1.findings_lcx_stenosis
+    assert res1.findings_lad_stenosis == ""
+
+    # 2. Under 'Circumflex Coronary Artery:' header on preceding line
+    text2 = (
+        "FINDINGS:\n"
+        "Circumflex Coronary Artery:\n"
+        "The ostium of the proximal circumflex coronary artery has a severely calcified 80% stenosis involving the origin of the first obtuse marginal artery."
+    )
+    res2 = extractor.extract(findings_text=text2)
+    assert "OSTIAL PROXIMAL LCX" in res2.findings_lcx_stenosis
+    assert "80%" in res2.findings_lcx_stenosis
+
+    # 3. Under 'Circumflex Coronary Artery:' header with segment reference without repeating 'circumflex'
+    text3 = (
+        "FINDINGS:\n"
+        "Circumflex Coronary Artery:\n"
+        "The ostium of the proximal segment has a severely calcified 80% stenosis involving the origin of the first obtuse marginal artery."
+    )
+    res3 = extractor.extract(findings_text=text3)
+    assert "OSTIAL PROXIMAL LCX" in res3.findings_lcx_stenosis
+    assert "80%" in res3.findings_lcx_stenosis
+
+
+def test_circumflex_cath_angiogram_pipeline_integration():
+    from cardio_tagger.sieve_engine import CascadingCardioSieve
+    import yaml
+    from pathlib import Path
+    ont_path = Path(__file__).resolve().parents[1] / "cardio_tagger" / "ontology" / "cardio_concepts.yaml"
+    ont = yaml.safe_load(ont_path.read_text(encoding="utf-8"))
+    sieve = CascadingCardioSieve(ontology=ont, enable_gliner=False)
+
+    text = (
+        "CARDIAC CATHETERIZATION REPORT\n"
+        "PATIENT: TAN AH KOW\n\n"
+        "CORONARY ANGIOGRAM:\n"
+        "Left Main Coronary Artery: Normal.\n"
+        "Left Anterior Descending Coronary Artery: 70% mid LAD stenosis.\n"
+        "Circumflex Coronary Artery: The ostium of the proximal circumflex coronary artery has a severely calcified 80% stenosis involving the origin of the first obtuse marginal artery.\n"
+        "Right Coronary Artery: Normal.\n\n"
+        "CONCLUSION:\n"
+        "1. Two-vessel CAD.\n"
+        "2. Successful PCI to LAD."
+    )
+    res = sieve.evaluate_document("cath_circumflex.pdf", [text])
+    assert "OSTIAL PROXIMAL LCX" in res.findings_lcx_stenosis
+    assert "80%" in res.findings_lcx_stenosis
+    assert "LAD: 70%" in res.findings_lad_stenosis
+    assert "LEFT MAIN: 0%" in res.findings_lmca_stenosis
+    assert "RCA: 0%" in res.findings_rca_stenosis
+
+
 def test_section_parser_findings_and_conclusion_split():
     from cardio_tagger.section_parser import ClinicalSectionParser
     parser = ClinicalSectionParser()

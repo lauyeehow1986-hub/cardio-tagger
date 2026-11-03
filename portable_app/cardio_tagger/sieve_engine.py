@@ -314,9 +314,10 @@ class CascadingCardioSieve:
         demographics = self.demographics_extractor.extract(page1_str)
 
         # Extract coronary vessel stenosis for Conclusion and Diagnostic Findings scopes
+        findings_scope_text = parsed.findings_text or parsed.full_text
         stenosis_res = self.stenosis_extractor.extract(
             conclusion_text=parsed.conclusion_text,
-            findings_text=parsed.findings_text,
+            findings_text=findings_scope_text,
         )
 
         elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 3)

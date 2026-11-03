@@ -72,7 +72,11 @@ class CoronaryStenosisExtractor:
         rf"(?i)\b(?P<vessel>(?:the\s+)?(?:(?:ostium|origin)\s+of\s+(?:the\s+)?)?(?:{MODIFIERS}[\s\-]+)*(?:{VESSEL_CORE})(?:[\s\-]+{MODIFIERS})*)\b"
     )
 
-    QUAL_PREFIX = r"(?:non[\-\s]flow[\-\s]limiting|non[\-\s]significant|mild(?:[\-\s]to[\-\s]moderate)?|moderate(?:[\-\s]to[\-\s]severe)?|severe|critical)"
+    HEADER_VESSEL_PATTERN = re.compile(
+        r"(?i)^\s*(?P<vessel>(?:LMCA|LEFT\s+MAIN|LMS|LM|LAD|LEFT\s+ANTERIOR\s+DESCENDING|LCX|LEFT\s+CIRCUMFLEX|CIRCUMFLEX|CIRC\b|RCA|RIGHT\s+CORONARY|SVG(?:\s+to\s+[a-z0-9\-\s]+)?|LIMA(?:\s+to\s+[a-z0-9\-\s]+)?)(?:\s+(?:CORONARY\s+)?(?:ARTERY|BRANCH|VESSEL))?)[\t ]*(?:[:\-]|$)[\t ]*(?P<rest>.*)"
+    )
+
+    QUAL_PREFIX = r"(?:non[\-\s]flow[\-\s]limiting|non[\-\s]significant|mild(?:[\-\s]to[\-\s]moderate)?|moderate(?:[\-\s]to[\-\s]severe)?|severe(?:ly)?(?:\s+calcified)?|moderate(?:ly)?(?:\s+calcified)?|mild(?:ly)?(?:\s+calcified)?|calcified|critical)"
     PCT_BODY = r"(?:(?:less\s+than\s*|greater\s+than\s*|[<>~]=?\s*|approx(?:imately)?\.?\s*|up\s+to\s*)?[0-9]{1,3}(?:\s*(?:-|to|\/)\s*[0-9]{1,3})?\s*%)"
     OCCL_PATTERN = r"(?:100%\s*(?:CTO|chronic\s+total\s+occlusion|total\s+occlusion|occlusion|occluded)|total(?:ly)?\s+occlu(?:ded|sion)|chronic\s+total\s+occlusion|CTO|subtotal(?:ly)?\s+occlu(?:ded|sion)|99%\s*(?:critical|stenosis)?)"
     STENT_PATTERN = r"(?:patent\s+stent|stent\s+is\s+patent|patent\s+des|patent|in[\-\s]?stent\s+restenosis|isr)"
@@ -273,9 +277,14 @@ class CoronaryStenosisExtractor:
 
         lines = [l.strip() for l in re.split(r"[\r\n;]+", text) if l.strip()]
         seen_entries: Set[Tuple[str, str]] = set()
+        current_vessel_context: Optional[Tuple[str, str]] = None
 
         for l in lines:
             l_clean = re.sub(r"^\s*[0-9]+[\.\)]\s*", "", l)
+            if re.match(r"(?i)^\s*(?:CONCLUSION|IMPRESSION|PLAN|FINDINGS|SUMMARY|RECOMMENDATIONS?)\s*[:\-]?\s*$", l_clean):
+                current_vessel_context = None
+                continue
+
             sub_chunks = [
                 sc.strip()
                 for sc in re.split(r"(?<!\bapprox)(?<!\best)(?<!\bdr)(?<!\bmr)\.\s+", l_clean, flags=re.I)
@@ -283,14 +292,14 @@ class CoronaryStenosisExtractor:
             ]
             for chunk in sub_chunks:
                 # 1. Header check: e.g. "LAD: 80% proximal stenosis, 50% mid lesion." or "LMCA: Normal."
-                m_head = re.match(
-                    r"(?i)^\s*(?P<vessel>LMCA|LEFT MAIN|LMS|LM|LAD|LEFT ANTERIOR DESCENDING|LCX|LEFT CIRCUMFLEX|CIRCUMFLEX|RCA|RIGHT CORONARY|SVG(?:\s+to\s+[a-z0-9\-\s]+)?|LIMA(?:\s+to\s+[a-z0-9\-\s]+)?)[\t ]*[:\-]\s*(?P<rest>.*)",
-                    chunk,
-                )
+                m_head = self.HEADER_VESSEL_PATTERN.match(chunk)
                 if m_head:
                     raw_v = m_head.group("vessel").strip()
                     terr, base_v = self.standardize_vessel(raw_v)
-                    rest = m_head.group("rest")
+                    current_vessel_context = (terr, base_v)
+                    rest = m_head.group("rest").strip()
+                    if not rest:
+                        continue
                     clauses = [c.strip() for c in re.split(r"[,;]+", rest) if c.strip()]
                     for cl in clauses:
                         if re.search(rf"(?i)\b{self.ZERO_STENOSIS_PATTERN}\b", cl):
@@ -303,14 +312,33 @@ class CoronaryStenosisExtractor:
                         m_st = self.ALL_STENOSIS_PATTERN.search(cl)
                         if m_st:
                             st_val = self._normalize_stenosis_desc(m_st.group("stenosis"))
-                            m_mod = re.search(r"(?i)\b(" + self.MODIFIERS + r")\b", cl)
-                            mod_prefix = f"{m_mod.group(1).upper()} " if m_mod else ""
-                            if mod_prefix == "PROX ":
-                                mod_prefix = "PROXIMAL "
-                            entry = f"{mod_prefix}{base_v}: {st_val}"
-                            if (terr, entry) not in seen_entries:
-                                seen_entries.add((terr, entry))
-                                results[terr].append(entry)
+                            cl_lead = cl[:m_st.start()]
+                            m_v = self.VESSEL_NAME_PATTERN.search(cl_lead)
+                            if m_v:
+                                v_terr, v_name = self.standardize_vessel(m_v.group("vessel"))
+                                target_terr = v_terr if v_terr != "OTHER" else terr
+                                entry = f"{v_name}: {st_val}"
+                            else:
+                                mods = []
+                                if re.search(r"\b(?:ostium|origin)\b", cl_lead, re.I):
+                                    mods.append("OSTIAL")
+                                for mod in ["PROXIMAL", "MID", "DISTAL", "APICAL", "SMALL", "LARGE"]:
+                                    if re.search(rf"\b{mod}\b", cl_lead, re.I) or (mod == "PROXIMAL" and re.search(r"\bprox\b", cl_lead, re.I)):
+                                        mods.append(mod)
+                                cl_tail = cl[m_st.end():]
+                                if not mods:
+                                    if re.search(r"\b(?:ostium|origin)\b", cl_tail, re.I):
+                                        mods.append("OSTIAL")
+                                    for mod in ["PROXIMAL", "MID", "DISTAL", "APICAL", "SMALL", "LARGE"]:
+                                        if re.search(rf"\b{mod}\b", cl_tail, re.I) or (mod == "PROXIMAL" and re.search(r"\bprox\b", cl_tail, re.I)):
+                                            mods.append(mod)
+                                prefix = " ".join(mods) + (" " if mods else "")
+                                target_terr = terr
+                                entry = f"{prefix}{base_v}: {st_val}"
+
+                            if (target_terr, entry) not in seen_entries:
+                                seen_entries.add((target_terr, entry))
+                                results[target_terr].append(entry)
                     continue
 
                 # 2. Prose check
@@ -347,7 +375,11 @@ class CoronaryStenosisExtractor:
                         continue
                     st_val = self._normalize_stenosis_desc(st_m.group("stenosis"))
                     tail = chunk[st_m.end(): st_m.end() + 60]
-                    m_prep = re.match(r"^\s*(?:(?:of|in|to|at)\s+)?(?P<after>.*)", tail, re.I)
+                    # Block secondary involvement phrases from attributing stenosis to the involved secondary branch
+                    if re.search(r"^\s*(?:(?:stenosis|disease|lesion|narrowing|plaque)\s+)?(?:involving|extending\s+into|sparing)\b", tail, re.I):
+                        continue
+
+                    m_prep = re.match(r"^\s*(?:(?:stenosis|disease|lesion|narrowing|plaque)\s+)?(?:of|in|to|at)\s+(?P<after>.*)", tail, re.I)
                     if m_prep:
                         after_text = m_prep.group("after")
                         m_v = self.VESSEL_NAME_PATTERN.search(after_text)
@@ -355,10 +387,32 @@ class CoronaryStenosisExtractor:
                             raw_v = m_v.group("vessel").strip()
                             terr, v_std = self.standardize_vessel(raw_v)
                             if terr != "OTHER":
+                                claimed_stenoses.add(st_m.start())
                                 entry = f"{v_std}: {st_val}"
                                 if (terr, entry) not in seen_entries:
                                     seen_entries.add((terr, entry))
                                     results[terr].append(entry)
+
+                # Fallback to active vessel block context for any unclaimed stenosis in this chunk
+                if current_vessel_context:
+                    for st_m in self.ALL_STENOSIS_PATTERN.finditer(chunk):
+                        if st_m.start() in claimed_stenoses:
+                            continue
+                        claimed_stenoses.add(st_m.start())
+                        st_val = self._normalize_stenosis_desc(st_m.group("stenosis"))
+                        ctx_terr, ctx_v = current_vessel_context
+                        lead_text = chunk[:st_m.start()]
+                        mods = []
+                        if re.search(r"\b(?:ostium|origin)\b", lead_text, re.I):
+                            mods.append("OSTIAL")
+                        for mod in ["PROXIMAL", "MID", "DISTAL", "APICAL", "SMALL", "LARGE"]:
+                            if re.search(rf"\b{mod}\b", lead_text, re.I) or (mod == "PROXIMAL" and re.search(r"\bprox\b", lead_text, re.I)):
+                                mods.append(mod)
+                        prefix = " ".join(mods) + (" " if mods else "")
+                        entry = f"{prefix}{ctx_v}: {st_val}"
+                        if (ctx_terr, entry) not in seen_entries:
+                            seen_entries.add((ctx_terr, entry))
+                            results[ctx_terr].append(entry)
 
         # Clean redundant patent entries if explicit percentage or 0% exists for that vessel
         cleaned_results: Dict[str, List[str]] = {}
