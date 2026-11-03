@@ -48,6 +48,13 @@ class ParsedDocument:
             return "\n\n".join(s.text for s in proc_secs)
         return ""
 
+    @property
+    def pci_text(self) -> str:
+        pci_secs = self.all_sections.get("pci_intervention", [])
+        if pci_secs:
+            return "\n\n".join(s.text for s in pci_secs)
+        return ""
+
 
 
 class ClinicalSectionParser:
@@ -83,8 +90,19 @@ class ClinicalSectionParser:
         "indication": re.compile(
             r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:INDICATIONS?|HISTORY|CLINICAL[\t ]+HISTORY)[\t ]*(?:[:\-—\n]|$)"
         ),
+        "pci_intervention": re.compile(
+            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:"
+            r"PCI[\t ]+INTERVENTIONS?|"
+            r"PERCUTANEOUS[\t ]+CORONARY[\t ]+INTERVENTIONS?|"
+            r"PCI[\t ]+PROCEDURES?|"
+            r"ANGIOPLASTY[\t ]+DETAILS?|"
+            r"CORONARY[\t ]+INTERVENTIONS?|"
+            r"PCI[\t ]+DETAILS?|"
+            r"INTERVENTIONS?"
+            r")[\t ]*(?:[:\-—\n]|$)"
+        ),
         "procedure": re.compile(
-            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:PROCEDURES?[\t ]+PERFORMED|PROCEDURE[\t ]+DETAILS?|TECHNIQUE|INTERVENTION)[\t ]*(?:[:\-—\n]|$)"
+            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:PROCEDURES?[\t ]+PERFORMED|PROCEDURE[\t ]+DETAILS?|TECHNIQUE)[\t ]*(?:[:\-—\n]|$)"
         ),
         "hemodynamics": re.compile(
             r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:HEMODYNAMICS?|VENTRICULOGRAPHY|LEFT[\t ]+VENTRICULOGRAM)[\t ]*(?:[:\-—\n]|$)"

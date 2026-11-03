@@ -259,3 +259,25 @@ def test_section_parser_findings_and_conclusion_split():
     doc = parser.parse_document("test.pdf", [page1])
     assert "70% mid stenosis" in doc.findings_text
     assert "Two-vessel CAD" in doc.conclusion_text
+
+
+def test_pci_intervention_section_parsing_and_isolation():
+    from cardio_tagger.section_parser import ClinicalSectionParser
+    parser = ClinicalSectionParser()
+    text = (
+        "CARDIAC CATHETERIZATION REPORT\n"
+        "FINDINGS:\n"
+        "Left Anterior Descending Coronary Artery: 80% proximal LAD stenosis.\n"
+        "PCI INTERVENTION:\n"
+        "Proximal LAD:\n"
+        "Guiding catheter: 6Fr EBU 3.5 Launcher\n"
+        "Successful angioplasty. Residual stenosis 0%.\n"
+        "CONCLUSION:\n"
+        "CAD s/p PCI to LAD."
+    )
+    parsed = parser.parse_pages("test.pdf", [text])
+    assert "80% proximal LAD stenosis" in parsed.findings_text
+    assert "Residual stenosis 0%" not in parsed.findings_text
+    assert "Residual stenosis 0%" in parsed.pci_text
+    assert "CAD s/p PCI to LAD" in parsed.conclusion_text
+
