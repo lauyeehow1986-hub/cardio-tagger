@@ -332,7 +332,14 @@ class CascadingCardioSieve:
         )
 
         # Extract PCI intervention (intervened vessels, granular devices, success outcome, residual stenosis)
-        pci_res = self.pci_extractor.extract(parsed.pci_text)
+        proc_secs = parsed.all_sections.get("procedure", [])
+        proc_text = "\n\n".join(s.text for s in proc_secs) if proc_secs else ""
+        pci_scope_text = self.pci_extractor.find_pci_text_fallback(
+            pci_text=parsed.pci_text,
+            procedure_text=proc_text,
+            full_text=parsed.full_text,
+        )
+        pci_res = self.pci_extractor.extract(pci_scope_text)
 
         elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 3)
         return DocumentTagResult(

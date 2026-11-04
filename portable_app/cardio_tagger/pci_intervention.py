@@ -36,23 +36,51 @@ class PCIInterventionExtractor:
         "3RD": "3",
     }
 
+    VESSEL_CORE = (
+        r"(?:SVG|LIMA|RIMA|BIMA|SAPHENOUS\s+VEIN(?:\s+GRAFT)?)\s+TO\s+[A-Z0-9\-\s/]+|"
+        r"(?:LMCA|LEFT\s+MAIN(?:\s+STEM)?|LMS|LM)(?:\s+(?:CORONARY\s+)?(?:ARTERY|STEM))?|"
+        r"(?:LAD|LEFT\s+ANTERIOR\s+DESCENDING)(?:\s+(?:CORONARY\s+)?(?:ARTERY|BRANCH|VESSEL))?|"
+        r"(?:LCX|LEFT\s+CIRCUMFLEX|CIRCUMFLEX|CIRC\b)(?:\s+(?:CORONARY\s+)?(?:ARTERY|BRANCH|VESSEL))?|"
+        r"(?:RCA|RIGHT\s+CORONARY)(?:\s+(?:CORONARY\s+)?(?:ARTERY|BRANCH|VESSEL))?|"
+        r"RPAV|RPDA|PDA|PLV|PLB|RPL[1-3]?|LPL[1-2]?|AM[1-2]?|"
+        r"(?:FIRST|1ST|SECOND|2ND|THIRD|3RD)?\s*(?:DIAGONAL(?:\s+[1-3])?|D[1-3])(?:\s+(?:CORONARY\s+)?(?:ARTERY|BRANCH))?|"
+        r"(?:FIRST|1ST|SECOND|2ND|THIRD|3RD)?\s*(?:OBTUSE\s+MARGINAL(?:\s+[1-3])?|OM[1-3])(?:\s+(?:CORONARY\s+)?(?:ARTERY|BRANCH))?|"
+        r"RAMUS(?:\s+INTERMEDIUS)?|RI\b"
+    )
+
+    MODIFIERS = r"(?:PROXIMAL|PROX|MID|DISTAL|OSTIAL|APICAL)"
+
+    LEAD_VESSEL_PREFIX = (
+        r"^\s*(?:[\*\-\•\u2022]\s*|[0-9]+[\.\)]\s*)*"
+        r"(?:(?:target(?:\s+vessel)?|vessel|site|lesion(?:\s+[0-9]+)?|pci\s+to|intervention\s+to|stent(?:\s+to)?)\s*[:\-]?\s*)?"
+    )
+
     # Vessel header regex matching vessels on their own line or before a colon
     VESSEL_HEADER_PATTERN = re.compile(
-        r"(?i)^\s*(?:[0-9]+[\.\)]\s*)?(?:(?:target\s+vessel|vessel|lesion)[\s:=]+)?"
-        r"(?P<vessel>"
-        r"(?:SVG|LIMA|RIMA|BIMA|SAPHENOUS\s+VEIN(?:\s+GRAFT)?)\s+TO\s+[A-Z0-9\-\s/]+|"
-        r"(?:PROXIMAL|PROX|MID|DISTAL|OSTIAL)?[\t \-]*"
-        r"(?:LMCA|LEFT\s+MAIN(?:\s+STEM)?|LMS|LM|"
-        r"LAD|LEFT\s+ANTERIOR\s+DESCENDING|"
-        r"LCX|LEFT\s+CIRCUMFLEX|CIRCUMFLEX|CIRC\b|"
-        r"RCA|RIGHT\s+CORONARY(?:\s+ARTERY)?|"
-        r"RPAV|RPDA|PDA|RPDA|PLV|PLB|RPL[1-3]?|LPL[1-2]?|AM[1-2]?|"
-        r"(?:FIRST|1ST|SECOND|2ND|THIRD|3RD)?\s*(?:DIAGONAL(?:\s+[1-3])?|D[1-3])|"
-        r"(?:FIRST|1ST|SECOND|2ND|THIRD|3RD)?\s*(?:OBTUSE\s+MARGINAL(?:\s+[1-3])?|OM[1-3])|"
-        r"RAMUS(?:\s+INTERMEDIUS)?|RI\b)"
-        r")"
-        r"[\t ]*(?:[:\-—]|$)",
-        flags=re.M,
+        rf"(?i){LEAD_VESSEL_PREFIX}(?P<vessel>(?:{MODIFIERS}[\t \-]+)*(?:{VESSEL_CORE})(?:[\t \-]+{MODIFIERS})*)"
+        r"(?:\s*\([^)]*\))?"
+        r"[\t ]*(?:[:\-—]|$)"
+    )
+
+    VESSEL_IN_TEXT_PATTERN = re.compile(
+        rf"(?i)\b(?P<vessel>(?:(?:the\s+)?(?:ostium|origin)\s+of\s+(?:the\s+)?)?(?:{MODIFIERS}[\t \-]+)*(?:{VESSEL_CORE})(?:[\t \-]+{MODIFIERS})*)\b"
+    )
+
+    PCI_HEADER_FALLBACK_RE = re.compile(
+        r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[\*\-\•\u2022]\s*|[0-9IVX]+[\.\)][\t ]*)?(?:"
+        r"PCI[\t ]*(?:[/\\—\-]|\bAND\b)?[\t ]*INTERVENTIONS?|"
+        r"PERCUTANEOUS[\t ]+CORONARY[\t ]+INTERVENTIONS?(?:[\t ]*\([A-Z0-9\s/\-]+\))?|"
+        r"PCI[\t ]+(?:PROCEDURES?|DETAILS?|REPORT|TECHNIQUE)|"
+        r"CORONARY[\t ]+INTERVENTIONS?(?:[\t ]*\([A-Z0-9\s/\-]+\))?|"
+        r"INTERVENTIONS?[\t ]*(?:[/\\—\-]|\bAND\b)?[\t ]*PCI|"
+        r"INTERVENTIONS?[\t ]+(?:PERFORMED|DETAILS?|PROCEDURES?|FINDINGS?)?|"
+        r"(?:BALLOON[\t ]+)?ANGIOPLASTY(?:[\t ]+(?:DETAILS?|REPORT|PROCEDURE))?|"
+        r"PTCA(?:[\t ]*(?:[/\\—\-]|\bAND\b)?[\t ]*(?:PCI|STENTING))?|"
+        r"PROCEDURE[\t ]*(?:[/\\—\-]|\bAND\b)?[\t ]*INTERVENTIONS?|"
+        r"INTERVENTIONAL[\t ]+(?:PROCEDURES?|FINDINGS?)|"
+        r"PCI(?=[\t ]*[:\-—])|"
+        r"INTERVENTIONS?"
+        r")[\t ]*(?:[:\-—\n]|$)"
     )
 
     RESIDUAL_PATTERN = re.compile(
@@ -189,6 +217,34 @@ class PCIInterventionExtractor:
         cleaned = re.sub(r"\s+", " ", cleaned)
         return cleaned.rstrip(".;")
 
+    def find_pci_text_fallback(self, pci_text: str = "", procedure_text: str = "", full_text: str = "") -> str:
+        """
+        Retrieves PCI intervention text with hierarchical fallback:
+        1. pci_text if populated
+        2. procedure_text if containing interventional/stenting hardware
+        3. full_text scan for PCI section header and trailing content
+        """
+        if pci_text and pci_text.strip():
+            return pci_text.strip()
+
+        if procedure_text and procedure_text.strip():
+            if re.search(r"(?i)\b(?:guiding|catheter|balloon|stent|des\b|pci|angioplasty|residual\s+stenosis)\b", procedure_text):
+                return procedure_text.strip()
+
+        if full_text and full_text.strip():
+            m = self.PCI_HEADER_FALLBACK_RE.search(full_text)
+            if m:
+                tail = full_text[m.end():]
+                m_stop = re.search(
+                    r"(?im)^[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:CONCLUSION|IMPRESSION|PLAN|FINDINGS|HEMODYNAMICS?|COMPLICATIONS?|RECOMMENDATIONS?|DISPOSITION|ATTENDING|SIGNED)[\t ]*(?:[:\-—\n]|$)",
+                    tail,
+                )
+                if m_stop:
+                    return tail[:m_stop.start()].strip()
+                return tail[:3000].strip()
+
+        return ""
+
     def extract(self, pci_text: str = "") -> PCIInterventionResult:
         if not pci_text or not pci_text.strip():
             return PCIInterventionResult()
@@ -238,6 +294,14 @@ class PCIInterventionExtractor:
         seen_vessels: Set[str] = set()
 
         for terr, v_name, blk_lines in blocks:
+            # If block has no explicit vessel header, resolve vessel from block text
+            if v_name == "UNSPECIFIED":
+                joined_blk = " ".join(blk_lines)
+                m_v = self.VESSEL_IN_TEXT_PATTERN.search(joined_blk)
+                if m_v:
+                    raw_v = m_v.group("vessel").strip()
+                    terr, v_name = self.standardize_vessel(raw_v)
+
             if v_name != "UNSPECIFIED" and v_name not in seen_vessels:
                 seen_vessels.add(v_name)
                 intervened_vessels_list.append(v_name)

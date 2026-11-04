@@ -101,3 +101,72 @@ def test_pci_intervention_all_territories_and_branches():
     assert "OM1" in res.intervened_vessels
     assert "RPAV" in res.intervened_vessels
     assert "SVG TO RPDA" in res.intervened_vessels
+
+
+def test_pci_intervention_spelled_out_and_bulleted_vessel_headers():
+    extractor = PCIInterventionExtractor()
+    text = (
+        "PCI INTERVENTION:\n"
+        "Left Anterior Descending Coronary Artery:\n"
+        "Guiding catheter: 6Fr EBU 3.5 Launcher\n"
+        "Balloon: 3.0 x 15 mm Sapphire NC. 18 atm\n"
+        "Drug-eluting stent: 3.5 x 20 mm Synergy. 14 atm\n"
+        "Successful angioplasty. Residual stenosis 0%.\n\n"
+        "* Circumflex Coronary Artery (Culprit):\n"
+        "Balloon: 2.5 x 15 mm\n"
+        "Successful angioplasty. Residual stenosis 0%.\n\n"
+        "Target: Proximal Right Coronary Artery:\n"
+        "Drug-eluting stent: 4.0 x 24 mm Onyx\n"
+        "Successful angioplasty. Residual stenosis 0%."
+    )
+    res = extractor.extract(text)
+    assert res.lad_residual_stenosis == "LAD: 0%"
+    assert res.lcx_residual_stenosis == "LCX: 0%"
+    assert res.rca_residual_stenosis == "PROXIMAL RCA: 0%"
+    assert "LAD" in res.intervened_vessels
+    assert "LCX" in res.intervened_vessels
+    assert "PROXIMAL RCA" in res.intervened_vessels
+
+
+def test_pci_intervention_single_vessel_narrative_without_header():
+    extractor = PCIInterventionExtractor()
+    text = (
+        "PCI INTERVENTION:\n"
+        "Successful angioplasty and stenting of proximal LAD.\n"
+        "Guiding catheter: 6Fr EBU 3.5 Launcher (Medtronic)\n"
+        "Balloon: 3.5 x 15 mm Sapphire NC. 18 atm\n"
+        "Drug-eluting stent: 3.5 x 20 mm Synergy Megatron. 14 atm\n"
+        "Residual stenosis 0%."
+    )
+    res = extractor.extract(text)
+    assert res.intervened_vessels == "PROXIMAL LAD"
+    assert res.lad_residual_stenosis == "PROXIMAL LAD: 0%"
+    assert "PROXIMAL LAD: [GUIDING CATHETER]" in res.devices_used
+
+
+def test_pci_section_parser_delimiters_and_pipeline_fallback():
+    from cardio_tagger.sieve_engine import CascadingCardioSieve
+    import yaml
+    from pathlib import Path
+    ont_path = Path(__file__).resolve().parents[1] / "cardio_tagger" / "ontology" / "cardio_concepts.yaml"
+    ont = yaml.safe_load(ont_path.read_text(encoding="utf-8"))
+    sieve = CascadingCardioSieve(ontology=ont, enable_gliner=False)
+
+    text = (
+        "CARDIAC CATHETERIZATION REPORT\n"
+        "PATIENT: TAN AH KOW\n\n"
+        "PROCEDURE:\n"
+        "PCI / INTERVENTION:\n"
+        "Left Anterior Descending Coronary Artery:\n"
+        "Guiding catheter: 6Fr EBU 3.5 Launcher\n"
+        "Balloon: 3.0 x 15 mm Sapphire NC. 18 atm\n"
+        "Drug-eluting stent: 3.5 x 20 mm Synergy. 14 atm\n"
+        "Successful angioplasty. Residual stenosis 0%.\n\n"
+        "CONCLUSION:\n"
+        "Successful PCI to LAD."
+    )
+    res = sieve.evaluate_document("cath_pci_slash.pdf", [text])
+    assert res.pci_intervened_vessels == "LAD"
+    assert res.pci_lad_residual_stenosis == "LAD: 0%"
+    assert "LAD: SUCCESSFUL ANGIOPLASTY" in res.pci_success_status
+
