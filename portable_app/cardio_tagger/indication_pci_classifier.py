@@ -115,7 +115,7 @@ class IndicationPCIClassifier:
     PAST_PROC_PATTERN = re.compile(
         r"\b(?:"
         r"(?:history\s+of|h/o|prior|previous|past|old|remote|status[\s\-]post|s/p|hx\s+of|patent)\s+"
-        r"[^.;\n]*?\b(?:pci|stent(?:s|ing)?|ptca|angioplasty|cabg|revascularization)\b|"
+        r"(?:(?!now|underwent|presenting|current|acute)[^.;\n])*?\b(?:pci|stent(?:s|ing)?|ptca|angioplasty|cabg|revascularization)\b|"
         r"\b(?:pci|stent(?:s|ing)?|ptca|angioplasty|cabg)\b\s*"
         r"(?:in\s+[12][90]\d{2}|\([12][90]\d{2}\)|[12][90]\d{2}|\d+\s+(?:years?|yrs?|months?|mths?)\s+ago)\b"
         r")",
@@ -184,7 +184,8 @@ class IndicationPCIClassifier:
         r"recommend(?:ed)?\s+(?:for\s+)?(?:urgent\s+|emergent\s+|elective\s+)?cabg\b|"
         r"plan\s+(?:for\s+)?(?:urgent\s+|emergent\s+|elective\s+)?cabg\b|"
         r"for\s+(?:urgent\s+|emergent\s+|elective\s+)?cabg\b|"
-        r"referred\s+for\s+surgical\s+(?:revascularization|cabg)\b"
+        r"referred\s+for\s+surgical\s+(?:revascularization|cabg)\b|"
+        r"(?:pci|intervention|revascularization|stenting|angioplasty)\s+(?:was\s+|is\s+)?not\s+(?:performed|done|attempted|indicated)\b"
         r")\b",
         re.IGNORECASE,
     )

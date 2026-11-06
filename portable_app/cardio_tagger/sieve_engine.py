@@ -32,12 +32,14 @@ try:
     from .patient_demographics import PatientDemographicsExtractor, PatientDemographicsResult
     from .coronary_stenosis import CoronaryStenosisExtractor, CoronaryStenosisResult
     from .pci_intervention import PCIInterventionExtractor, PCIInterventionResult
+    from .indication_pci_classifier import IndicationPCIClassifier, IndicationPCIResult
 except ImportError:
     from section_parser import ClinicalSectionParser, ParsedDocument
     from echo_lvef import EchoLVEFExtractor, EchoLVEFResult
     from patient_demographics import PatientDemographicsExtractor, PatientDemographicsResult
     from coronary_stenosis import CoronaryStenosisExtractor, CoronaryStenosisResult
     from pci_intervention import PCIInterventionExtractor, PCIInterventionResult
+    from indication_pci_classifier import IndicationPCIClassifier, IndicationPCIResult
 
 
 
@@ -103,6 +105,18 @@ class DocumentTagResult:
     pci_graft_residual_stenosis: str = ""
     pci_success_status: str = ""
     pci_devices_used: str = ""
+    indication_stemi: str = "NO"
+    indication_stemi_evidence: str = ""
+    indication_stemi_confidence: float = 0.0
+    indication_ami: str = "NO"
+    indication_ami_evidence: str = ""
+    indication_ami_confidence: float = 0.0
+    pci_done: str = "NO"
+    pci_done_evidence: str = ""
+    pci_done_confidence: float = 0.0
+    ppci_done: str = "NO"
+    ppci_done_evidence: str = ""
+    ppci_done_confidence: float = 0.0
 
 
 
@@ -208,6 +222,7 @@ class CascadingCardioSieve:
         self.demographics_extractor = PatientDemographicsExtractor()
         self.stenosis_extractor = CoronaryStenosisExtractor()
         self.pci_extractor = PCIInterventionExtractor()
+        self.indication_pci_classifier = IndicationPCIClassifier()
 
         self.enable_gliner = enable_gliner
         self.enable_ollama = enable_ollama
@@ -340,6 +355,10 @@ class CascadingCardioSieve:
             full_text=parsed.full_text,
         )
         pci_res = self.pci_extractor.extract(pci_scope_text)
+        ind_pci_res = self.indication_pci_classifier.classify(
+            parsed=parsed,
+            pci_result=pci_res,
+        )
 
         elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 3)
         return DocumentTagResult(
@@ -385,6 +404,18 @@ class CascadingCardioSieve:
             pci_graft_residual_stenosis=pci_res.graft_residual_stenosis,
             pci_success_status=pci_res.success_status,
             pci_devices_used=pci_res.devices_used,
+            indication_stemi=ind_pci_res.indication_stemi,
+            indication_stemi_evidence=ind_pci_res.indication_stemi_evidence,
+            indication_stemi_confidence=ind_pci_res.indication_stemi_confidence,
+            indication_ami=ind_pci_res.indication_ami,
+            indication_ami_evidence=ind_pci_res.indication_ami_evidence,
+            indication_ami_confidence=ind_pci_res.indication_ami_confidence,
+            pci_done=ind_pci_res.pci_done,
+            pci_done_evidence=ind_pci_res.pci_done_evidence,
+            pci_done_confidence=ind_pci_res.pci_done_confidence,
+            ppci_done=ind_pci_res.ppci_done,
+            ppci_done_evidence=ind_pci_res.ppci_done_evidence,
+            ppci_done_confidence=ind_pci_res.ppci_done_confidence,
         )
 
 

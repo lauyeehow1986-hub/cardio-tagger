@@ -366,6 +366,33 @@ def test_pci_intervention_end_to_end_sieve():
     assert "[DRUG-ELUTING STENT]" in res.pci_devices_used
 
 
+def test_pipeline_indication_pci_fields():
+    from cardio_tagger.sieve_engine import CascadingCardioSieve
+    import yaml
+    from pathlib import Path
+    ont_path = Path(__file__).resolve().parents[1] / "cardio_tagger" / "ontology" / "cardio_concepts.yaml"
+    ont = yaml.safe_load(ont_path.read_text(encoding="utf-8"))
+    sieve = CascadingCardioSieve(ontology=ont, enable_gliner=False)
+
+    text = (
+        "INDICATION: Inferior STEMI.\n"
+        "PCI INTERVENTION:\n"
+        "RCA:\n"
+        "Drug-eluting stent: 3.5 x 24 mm Onyx. 14 atm.\n"
+        "Successful angioplasty. Residual stenosis 0%.\n"
+        "CONCLUSION: Successful primary angioplasty to RCA."
+    )
+    res = sieve.evaluate_document("stemi_ppci.pdf", [text])
+    assert res.indication_stemi == "YES"
+    assert "STEMI" in res.indication_stemi_evidence
+    assert res.indication_stemi_confidence >= 0.90
+    assert res.indication_ami == "YES"
+    assert res.pci_done == "YES"
+    assert res.ppci_done == "YES"
+    assert res.ppci_done_confidence >= 0.90
+    assert "RCA" in res.pci_intervened_vessels
+
+
 if __name__ == "__main__":
     test_case1_final_page_newline()
     test_case2_page1_early_conclusion()
