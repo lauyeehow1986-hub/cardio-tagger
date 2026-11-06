@@ -13,13 +13,6 @@ import re
 from cardio_tagger.section_parser import ParsedDocument, ClinicalSectionParser
 from cardio_tagger.pci_intervention import PCIInterventionResult
 
-# Ensure ClinicalSectionParser has parse_sections convenience method
-if not hasattr(ClinicalSectionParser, "parse_sections"):
-    def _parse_sections(self, text: str) -> ParsedDocument:
-        """Convenience method to parse a raw text string directly into a ParsedDocument."""
-        return self.parse_pages("inline.txt", [text])
-    ClinicalSectionParser.parse_sections = _parse_sections
-
 
 @dataclass
 class IndicationPCIResult:
@@ -49,10 +42,10 @@ class IndicationPCIClassifier:
     # NSTEMI regex patterns (must be strictly differentiated from STEMI)
     NSTEMI_PATTERN = re.compile(
         r"\b(?:"
-        r"non[\s\-]st[\s\-]?elevation(?:\s+myocardial\s+infarction|\s+mi)?|"
-        r"non[\s\-]stemi|"
+        r"non[\s\-]st[\s\-]?(?:segment\s+|seg\s+)?elevation(?:\s+myocardial\s+infarction|\s+mi)?|"
+        r"non[\s\-]?stemi|"
         r"nstemi|"
-        r"nste[\s\-]acs|"
+        r"nste[\s\-]?acs|"
         r"nste\-?mi"
         r")\b",
         re.IGNORECASE
@@ -62,7 +55,7 @@ class IndicationPCIClassifier:
     STEMI_PATTERN = re.compile(
         r"\b(?:"
         r"(?:acute\s+|subacute\s+|recent\s+)?(?:extensive\s+|anterior\s+|anterolateral\s+|anteroseptal\s+|inferior\s+|inferolateral\s+|inferoposterior\s+|lateral\s+|posterior\s+|apical\s+)*"
-        r"(?:st[\s\-]?elevation\s+(?:myocardial\s+infarction|mi)|(?<!non[\s\-])(?<!non\s)stemi|(?<!non[\s\-])(?<!non\s)ste\-?mi)"
+        r"(?:st[\s\-]?(?:segment\s+|seg\s+)?elevation\s+(?:myocardial\s+infarction|mi)|(?<!non[\s\-])(?<!non\s)stemi|(?<!non[\s\-])(?<!non\s)ste\-?mi)"
         r")\b",
         re.IGNORECASE
     )
@@ -75,17 +68,36 @@ class IndicationPCIClassifier:
         r"ami\b|"
         r"myocardial\s+infarction|"
         r"nstemi|"
-        r"non[\s\-]st[\s\-]?elevation(?:\s+myocardial\s+infarction|\s+mi)?|"
-        r"non[\s\-]stemi|"
+        r"non[\s\-]st[\s\-]?(?:segment\s+|seg\s+)?elevation(?:\s+myocardial\s+infarction|\s+mi)?|"
+        r"non[\s\-]?stemi|"
+        r"nste[\s\-]?acs|"
+        r"nste\-?mi|"
         r"stemi|"
-        r"st[\s\-]?elevation\s+(?:myocardial\s+infarction|mi)"
+        r"st[\s\-]?(?:segment\s+|seg\s+)?elevation\s+(?:myocardial\s+infarction|mi)"
         r")\b",
         re.IGNORECASE
     )
 
+    # Past history section types to strictly exclude
+    HISTORY_SECTION_TYPES = {
+        "history",
+        "pmh",
+        "pmhx",
+        "past_medical_history",
+        "medical_history",
+        "prior_history",
+    }
+
     # Past history line indicators to exclude past events
     HISTORY_LINE_PATTERN = re.compile(
-        r"(?i)^[\t ]*(?:past\s+medical\s+history|pmhx?|previous\s+history|medical\s+history|prior\s+history)\s*[:\-—]"
+        r"(?i)^[\t ]*(?:"
+        r"past\s+(?:medical\s+)?history(?:\s*[:\-—]|\s+|$)|"
+        r"pmhx?(?:\s*[:\-—]|\s+|$)|"
+        r"previous(?:\s+history)?\s*[:\-—]|"
+        r"history\s+of\s*[:\-—]|"
+        r"prior\s+(?:medical\s+)?history(?:\s*[:\-—]|\s+|$)|"
+        r"medical\s+history(?:\s*[:\-—]|\s+|$)"
+        r")"
     )
 
     def classify(
@@ -115,14 +127,16 @@ class IndicationPCIClassifier:
         Gathers (source_section, line_text) tuples in clinical priority:
         1. Explicit 'indication' sections
         2. Fallback to 'conclusion' sections if no indication present
-        3. Fallback to other procedural text if needed
-        Excludes explicit past history headers or lines.
+        3. Fallback to procedure sections/headers if needed
+        Strictly excludes any section or line representing past medical history.
         """
         candidates: List[Tuple[str, str]] = []
 
         # 1. Check indication sections
         ind_secs = parsed.all_sections.get("indication", [])
         for sec in ind_secs:
+            if sec.section_type in self.HISTORY_SECTION_TYPES:
+                continue
             if re.search(r"\b(?:past|pmh|previous|prior)\b", sec.header_matched, re.I):
                 continue
             for line in sec.text.split("\n"):
@@ -135,11 +149,31 @@ class IndicationPCIClassifier:
         if not candidates:
             conc_secs = parsed.conclusion_sections or parsed.all_sections.get("conclusion", [])
             for sec in conc_secs:
+                if sec.section_type in self.HISTORY_SECTION_TYPES:
+                    continue
+                if re.search(r"\b(?:past|pmh|previous|prior)\b", sec.header_matched, re.I):
+                    continue
                 for line in sec.text.split("\n"):
                     line_str = line.strip()
                     if not line_str or self.HISTORY_LINE_PATTERN.match(line_str):
                         continue
                     candidates.append(("conclusion", line_str))
+
+        # 3. Fallback to procedure sections if no indication or conclusion lines
+        if not candidates:
+            proc_secs = parsed.all_sections.get("procedure", [])
+            for sec in proc_secs:
+                if sec.section_type in self.HISTORY_SECTION_TYPES:
+                    continue
+                if re.search(r"\b(?:past|pmh|previous|prior)\b", sec.header_matched, re.I):
+                    continue
+                if sec.header_matched and not self.HISTORY_LINE_PATTERN.match(sec.header_matched):
+                    candidates.append(("procedure_header", sec.header_matched))
+                for line in sec.text.split("\n"):
+                    line_str = line.strip()
+                    if not line_str or self.HISTORY_LINE_PATTERN.match(line_str):
+                        continue
+                    candidates.append(("procedure", line_str))
 
         return candidates
 

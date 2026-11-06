@@ -87,6 +87,9 @@ class ClinicalSectionParser:
     ]
 
     OTHER_SECTION_HEADERS = {
+        "history": re.compile(
+            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:PAST[\t ]+(?:MEDICAL[\t ]+)?HISTORY|PMHX?|PREVIOUS(?:[\t ]+HISTORY)?|PRIOR[\t ]+(?:MEDICAL[\t ]+)?HISTORY|HISTORY[\t ]+OF)[\t ]*(?:[:\-—\n]|$)"
+        ),
         "indication": re.compile(
             r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:INDICATIONS?|HISTORY|CLINICAL[\t ]+HISTORY)[\t ]*(?:[:\-—\n]|$)"
         ),
@@ -107,7 +110,7 @@ class ClinicalSectionParser:
             r")[\t ]*(?:[:\-—\n]|$)"
         ),
         "procedure": re.compile(
-            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:PROCEDURES?[\t ]+PERFORMED|PROCEDURE[\t ]+DETAILS?|TECHNIQUE)[\t ]*(?:[:\-—\n]|$)"
+            r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:PROCEDURES?(?:[\t ]+(?:PERFORMED|DETAILS?|TITLE|NAME))?|TECHNIQUE)[\t ]*(?:[:\-—\n]|$)"
         ),
         "hemodynamics": re.compile(
             r"(?im)(?:^|\n|[.;]\s+)[\t ]*(?:[0-9IVX]+[\.\)][\t ]*)?(?:HEMODYNAMICS?|VENTRICULOGRAPHY|LEFT[\t ]+VENTRICULOGRAM)[\t ]*(?:[:\-—\n]|$)"
@@ -219,6 +222,10 @@ class ClinicalSectionParser:
     def parse_document(self, pdf_path: str, page_texts: List[str], used_ocr: bool = False) -> ParsedDocument:
         """Alias for parse_pages for document text array ingestion."""
         return self.parse_pages(pdf_path, page_texts, used_ocr=used_ocr)
+
+    def parse_sections(self, text: str) -> ParsedDocument:
+        """Convenience method to parse a raw text string directly into a ParsedDocument."""
+        return self.parse_pages("inline.txt", [text])
 
     def parse_pages(self, pdf_path: str, page_texts: List[str], used_ocr: bool = False) -> ParsedDocument:
         total_pages = len(page_texts)
