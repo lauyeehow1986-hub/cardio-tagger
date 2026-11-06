@@ -393,6 +393,84 @@ def test_pipeline_indication_pci_fields():
     assert "RCA" in res.pci_intervened_vessels
 
 
+def test_cli_base_fields_include_indication_and_pci():
+    from cardio_tagger.sieve_engine import DocumentTagResult
+    import dataclasses
+    field_names = [f.name for f in dataclasses.fields(DocumentTagResult)]
+    for expected in [
+        "indication_stemi", "indication_stemi_evidence", "indication_stemi_confidence",
+        "indication_ami", "indication_ami_evidence", "indication_ami_confidence",
+        "pci_done", "pci_done_evidence", "pci_done_confidence",
+        "ppci_done", "ppci_done_evidence", "ppci_done_confidence"
+    ]:
+        assert expected in field_names
+
+
+def test_cli_csv_row_assembly_includes_indication_and_pci(tmp_path):
+    import csv
+    import subprocess
+    cli_script = Path(__file__).resolve().parents[1] / "cardio_tagger" / "cli.py"
+    input_csv = tmp_path / "test_indication_input.csv"
+    output_csv = tmp_path / "test_indication_output.csv"
+    output_jsonl = tmp_path / "test_indication_output.jsonl"
+    checkpoint_db = tmp_path / "test_checkpoint.duckdb"
+
+    report_text = (
+        "Patient ID: PT_201\n"
+        "INDICATION: Acute inferior STEMI\n"
+        "PROCEDURE: Primary PCI to RCA\n"
+        "FINDINGS:\n"
+        "RCA: 100% acute thrombotic occlusion\n"
+        "LAD: 70% mid stenosis\n"
+        "PCI INTERVENTION:\n"
+        "RCA: 3.5x28mm DES placed. Residual stenosis 0%. Successful angioplasty.\n"
+        "CONCLUSION:\n"
+        "Successful primary PCI to RCA. Plan staged PCI to LAD in 4 weeks."
+    )
+    with open(input_csv, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["patient_id", "report_text"])
+        writer.writeheader()
+        writer.writerow({"patient_id": "PT_201", "report_text": report_text})
+
+    cmd = [
+        sys.executable,
+        str(cli_script),
+        "--input-csv",
+        str(input_csv),
+        "--output-csv",
+        str(output_csv),
+        "--output-jsonl",
+        str(output_jsonl),
+        "--checkpoint-db",
+        str(checkpoint_db),
+        "--workers",
+        "1",
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    assert proc.returncode == 0, f"CLI exited with error:\nSTDOUT: {proc.stdout}\nSTDERR: {proc.stderr}"
+
+    with open(output_csv, "r", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+        assert len(rows) == 1
+        row = rows[0]
+        expected_fields = [
+            "indication_stemi", "indication_stemi_evidence", "indication_stemi_confidence",
+            "indication_ami", "indication_ami_evidence", "indication_ami_confidence",
+            "pci_done", "pci_done_evidence", "pci_done_confidence",
+            "ppci_done", "ppci_done_evidence", "ppci_done_confidence"
+        ]
+        for field in expected_fields:
+            assert field in row, f"Missing field {field} in CSV row output"
+
+        assert row["indication_stemi"] == "YES"
+        assert "STEMI" in row["indication_stemi_evidence"].upper()
+        assert float(row["indication_stemi_confidence"]) >= 0.8
+        assert row["indication_ami"] == "YES"
+        assert row["pci_done"] == "YES"
+        assert row["ppci_done"] == "YES"
+        assert float(row["ppci_done_confidence"]) >= 0.8
+
+
 if __name__ == "__main__":
     test_case1_final_page_newline()
     test_case2_page1_early_conclusion()

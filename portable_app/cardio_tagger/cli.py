@@ -470,6 +470,18 @@ def main():
             "pci_graft_residual_stenosis",
             "pci_success_status",
             "pci_devices_used",
+            "indication_stemi",
+            "indication_stemi_evidence",
+            "indication_stemi_confidence",
+            "indication_ami",
+            "indication_ami_evidence",
+            "indication_ami_confidence",
+            "pci_done",
+            "pci_done_evidence",
+            "pci_done_confidence",
+            "ppci_done",
+            "ppci_done_evidence",
+            "ppci_done_confidence",
             "detected_cardio_concepts",
             "conclusion_found",
             "peak_tier_used",
@@ -531,6 +543,26 @@ def main():
                         row_out["findings_lcx_stenosis"] = res_dict.get("findings_lcx_stenosis", "")
                         row_out["findings_rca_stenosis"] = res_dict.get("findings_rca_stenosis", "")
                         row_out["findings_graft_stenosis"] = res_dict.get("findings_graft_stenosis", "")
+                        row_out["pci_intervened_vessels"] = res_dict.get("pci_intervened_vessels", "")
+                        row_out["pci_lmca_residual_stenosis"] = res_dict.get("pci_lmca_residual_stenosis", "")
+                        row_out["pci_lad_residual_stenosis"] = res_dict.get("pci_lad_residual_stenosis", "")
+                        row_out["pci_lcx_residual_stenosis"] = res_dict.get("pci_lcx_residual_stenosis", "")
+                        row_out["pci_rca_residual_stenosis"] = res_dict.get("pci_rca_residual_stenosis", "")
+                        row_out["pci_graft_residual_stenosis"] = res_dict.get("pci_graft_residual_stenosis", "")
+                        row_out["pci_success_status"] = res_dict.get("pci_success_status", "")
+                        row_out["pci_devices_used"] = res_dict.get("pci_devices_used", "")
+                        row_out["indication_stemi"] = res_dict.get("indication_stemi", "NO")
+                        row_out["indication_stemi_evidence"] = res_dict.get("indication_stemi_evidence", "")
+                        row_out["indication_stemi_confidence"] = res_dict.get("indication_stemi_confidence", 0.0)
+                        row_out["indication_ami"] = res_dict.get("indication_ami", "NO")
+                        row_out["indication_ami_evidence"] = res_dict.get("indication_ami_evidence", "")
+                        row_out["indication_ami_confidence"] = res_dict.get("indication_ami_confidence", 0.0)
+                        row_out["pci_done"] = res_dict.get("pci_done", "NO")
+                        row_out["pci_done_evidence"] = res_dict.get("pci_done_evidence", "")
+                        row_out["pci_done_confidence"] = res_dict.get("pci_done_confidence", 0.0)
+                        row_out["ppci_done"] = res_dict.get("ppci_done", "NO")
+                        row_out["ppci_done_evidence"] = res_dict.get("ppci_done_evidence", "")
+                        row_out["ppci_done_confidence"] = res_dict.get("ppci_done_confidence", 0.0)
                         row_out["detected_cardio_concepts"] = concept_dict["detected_cardio_concepts"]
 
                         row_out["conclusion_found"] = res_dict["conclusion_found"]
@@ -615,6 +647,18 @@ def main():
             "pci_graft_residual_stenosis",
             "pci_success_status",
             "pci_devices_used",
+            "indication_stemi",
+            "indication_stemi_evidence",
+            "indication_stemi_confidence",
+            "indication_ami",
+            "indication_ami_evidence",
+            "indication_ami_confidence",
+            "pci_done",
+            "pci_done_evidence",
+            "pci_done_confidence",
+            "ppci_done",
+            "ppci_done_evidence",
+            "ppci_done_confidence",
             "detected_cardio_concepts",
 
             "matched_concepts_count",
@@ -677,6 +721,26 @@ def main():
                             "findings_lcx_stenosis": res_dict.get("findings_lcx_stenosis", ""),
                             "findings_rca_stenosis": res_dict.get("findings_rca_stenosis", ""),
                             "findings_graft_stenosis": res_dict.get("findings_graft_stenosis", ""),
+                            "pci_intervened_vessels": res_dict.get("pci_intervened_vessels", ""),
+                            "pci_lmca_residual_stenosis": res_dict.get("pci_lmca_residual_stenosis", ""),
+                            "pci_lad_residual_stenosis": res_dict.get("pci_lad_residual_stenosis", ""),
+                            "pci_lcx_residual_stenosis": res_dict.get("pci_lcx_residual_stenosis", ""),
+                            "pci_rca_residual_stenosis": res_dict.get("pci_rca_residual_stenosis", ""),
+                            "pci_graft_residual_stenosis": res_dict.get("pci_graft_residual_stenosis", ""),
+                            "pci_success_status": res_dict.get("pci_success_status", ""),
+                            "pci_devices_used": res_dict.get("pci_devices_used", ""),
+                            "indication_stemi": res_dict.get("indication_stemi", "NO"),
+                            "indication_stemi_evidence": res_dict.get("indication_stemi_evidence", ""),
+                            "indication_stemi_confidence": res_dict.get("indication_stemi_confidence", 0.0),
+                            "indication_ami": res_dict.get("indication_ami", "NO"),
+                            "indication_ami_evidence": res_dict.get("indication_ami_evidence", ""),
+                            "indication_ami_confidence": res_dict.get("indication_ami_confidence", 0.0),
+                            "pci_done": res_dict.get("pci_done", "NO"),
+                            "pci_done_evidence": res_dict.get("pci_done_evidence", ""),
+                            "pci_done_confidence": res_dict.get("pci_done_confidence", 0.0),
+                            "ppci_done": res_dict.get("ppci_done", "NO"),
+                            "ppci_done_evidence": res_dict.get("ppci_done_evidence", ""),
+                            "ppci_done_confidence": res_dict.get("ppci_done_confidence", 0.0),
                             "detected_cardio_concepts": concept_dict["detected_cardio_concepts"],
 
                             "matched_concepts_count": len(res_dict["all_concept_matches"]),

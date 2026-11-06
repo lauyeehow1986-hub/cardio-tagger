@@ -10,8 +10,16 @@ from dataclasses import dataclass
 from typing import Optional, List, Dict, Any, Union, Tuple
 import re
 
-from cardio_tagger.section_parser import ParsedDocument, ClinicalSectionParser
-from cardio_tagger.pci_intervention import PCIInterventionResult
+try:
+    from .section_parser import ParsedDocument, ClinicalSectionParser
+    from .pci_intervention import PCIInterventionResult
+except ImportError:
+    try:
+        from cardio_tagger.section_parser import ParsedDocument, ClinicalSectionParser
+        from cardio_tagger.pci_intervention import PCIInterventionResult
+    except ImportError:
+        from section_parser import ParsedDocument, ClinicalSectionParser
+        from pci_intervention import PCIInterventionResult
 
 
 @dataclass
