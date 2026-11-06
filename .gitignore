@@ -10,6 +10,8 @@ __pycache__/
 
 # Workspace mirror
 .agents/
+.worktrees/
+worktrees/
 
 # Temporary runtime & model caches
 .cache/
